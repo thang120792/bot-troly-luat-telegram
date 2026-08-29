@@ -79,6 +79,44 @@ DỮ LIỆU ĐẶC BIỆT CẦN NẮM VỮNG VỀ TỈNH THANH HÓA:
 - Thẩm quyền cấp GCN theo QĐ 2604/QĐ-VP: Cấp xã tiếp nhận & xác nhận hiện trạng; Chi nhánh VPĐKĐĐ cấp huyện thẩm định và cấp đổi/cấp lại/biến động cho cá nhân; UBND cấp huyện cấp lần đầu."""
 
 # ══════════════════════════════════════════════════════════════════
+# PROMPT OCR CHUYÊN DỤNG CHO CCCD & GIẤY CHỨNG NHẬN (SỔ ĐỎ)
+# ══════════════════════════════════════════════════════════════════
+PROMPT_CCCD_EXACT = """Bạn là chuyên gia OCR tài liệu hành chính Việt Nam.
+Hãy đọc toàn bộ thông tin trên ảnh Căn cước công dân (CCCD) và trả về ĐÚNG CHUẨN JSON như sau:
+{
+  "id_number": "Số CCCD 12 chữ số",
+  "full_name": "Họ và tên viết in hoa",
+  "date_of_birth": "Ngày sinh DD/MM/YYYY",
+  "sex": "Giới tính (Nam hoặc Nữ)",
+  "place_of_origin": "Quê quán",
+  "place_of_residence": "Nơi thường trú",
+  "date_of_issue": "Ngày cấp DD/MM/YYYY",
+  "date_of_expiry": "Có giá trị đến DD/MM/YYYY"
+}
+Quy tắc:
+- Chỉ trả về JSON thuần túy, không có giải thích hay markdown code block.
+- Nếu trường nào không thấy, để giá trị ""."""
+
+PROMPT_LAND_EXACT = """Bạn là chuyên gia OCR tài liệu đất đai Việt Nam.
+Hãy đọc toàn bộ thông tin trên ảnh Giấy chứng nhận quyền sử dụng đất (Sổ đỏ/Sổ hồng) và trả về ĐÚNG CHUẨN JSON như sau:
+{
+  "certificate_serial_number": "Số phát hành GCN ở dưới cùng bìa (VD: DA 895241, CM 902946)",
+  "registration_book_number": "Số vào sổ cấp GCN (VD: CH 00071, CS 1234)",
+  "owner_name": "Tên người sử dụng đất / chủ sở hữu",
+  "parcel_number": "Thửa đất số (chỉ con số)",
+  "map_sheet_number": "Tờ bản đồ số (chỉ con số)",
+  "parcel_address": "Địa chỉ thửa đất",
+  "area_number": "Diện tích đất bằng số (VD: 150.5)",
+  "purpose_of_use": "Mục đích sử dụng (VD: Đất ở tại nông thôn (ONT))",
+  "time_of_use": "Thời hạn sử dụng (VD: Lâu dài)",
+  "date_of_issue": "Ngày cấp GCN (DD/MM/YYYY)",
+  "place_of_issue": "Nơi cấp / Cơ quan cấp"
+}
+Quy tắc:
+- Chỉ trả về JSON thuần túy, không có giải thích hay markdown code block.
+- Nếu trường nào không thấy, để giá trị ""."""
+
+# ══════════════════════════════════════════════════════════════════
 # AI ENGINE - GEMINI CHỦ ĐẠO & DỰ PHÒNG ZENMUX
 # ══════════════════════════════════════════════════════════════════
 def call_gemini_primary(question):
@@ -103,10 +141,7 @@ def call_gemini_primary(question):
     for idx, key in enumerate(GEMINI_API_KEYS):
         if not key or len(key) < 10:
             continue
-        key_label = f"Key #{idx+1}"
-
         for model in gemini_models:
-            # Giao thức 1: Query parameter + Header
             try:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
                 headers = {"Content-Type": "application/json", "x-goog-api-key": key}
@@ -118,10 +153,9 @@ def call_gemini_primary(question):
                         parts = candidates[0].get("content", {}).get("parts", [])
                         if parts and parts[0].get("text", "").strip():
                             return parts[0]["text"].strip(), f"Google Gemini Flash ({model})"
-            except Exception as e:
+            except Exception:
                 pass
 
-            # Giao thức 2: Bearer Authorization
             try:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
                 headers = {"Content-Type": "application/json", "Authorization": f"Bearer {key}"}
@@ -133,7 +167,7 @@ def call_gemini_primary(question):
                         parts = candidates[0].get("content", {}).get("parts", [])
                         if parts and parts[0].get("text", "").strip():
                             return parts[0]["text"].strip(), f"Google Gemini Flash ({model})"
-            except Exception as e:
+            except Exception:
                 pass
 
     return None, None
@@ -170,72 +204,12 @@ def call_zenmux_backup(question):
                 ans = re.sub(r'<think>.*?</think>', '', ans, flags=re.DOTALL).strip()
                 if len(ans) > 20:
                     return ans, f"ZenMux AI Gateway ({m})"
-        except Exception as e:
+        except Exception:
             continue
 
     return None, None
 
-# ══════════════════════════════════════════════════════════════════
-# DỮ LIỆU CỐ ĐỊNH THANH HÓA
-# ══════════════════════════════════════════════════════════════════
-KNOWLEDGE_RULES = [
-    {
-        "keywords": ["tách thửa", "diện tích tối thiểu", "hạn mức tách", "chia đất", "tách sổ", "tách đất"],
-        "answer": (
-            "Dạ, chào bạn! Về điều kiện và hạn mức tách thửa đất ở tại tỉnh Thanh Hóa, tôi xin tư vấn chi tiết như sau:\n\n"
-            "1. **Căn cứ pháp lý áp dụng:**\n"
-            "- Điều 220 Luật Đất đai 2024.\n"
-            "- Quyết định số 18/2026/QĐ-UBND của UBND tỉnh Thanh Hóa quy định về hạn mức giao đất, diện tích tối thiểu được phép tách thửa.\n\n"
-            "2. **Diện tích và kích thước tối thiểu được phép tách thửa đất ở:**\n"
-            "- **Tại các Phường thuộc Đô thị:** Diện tích tối thiểu **≥ 40 m²**, chiều rộng mặt tiền và chiều sâu **≥ 3,0 m**.\n"
-            "- **Tại các Xã thuộc khu vực Đồng bằng, Trung du & Ven biển:** Diện tích tối thiểu **≥ 40 m²**, chiều rộng mặt tiền và chiều sâu **≥ 4,0 m**.\n"
-            "- **Tại các Xã thuộc 11 huyện Miền núi Thanh Hóa:** Diện tích tối thiểu **≥ 50 m²**, chiều rộng mặt tiền và chiều sâu **≥ 5,0 m**.\n"
-            "- **Đất nông nghiệp:** Đất trồng cây lâu năm/hàng năm **≥ 500 m²**; Đất trồng lúa **≥ 1.000 m²**; Đất rừng sản xuất **≥ 3.000 m²**.\n\n"
-            "3. **Điều kiện bắt buộc khác:**\n"
-            "- Thửa đất đã có Giấy chứng nhận quyền sử dụng đất.\n"
-            "- Đất không có tranh chấp, không bị kê biên thi hành án, còn thời hạn sử dụng.\n"
-            "- Thửa đất mới hình thành và phần còn lại sau khi tách bắt buộc phải có lối đi kết nối với đường giao thông công cộng.\n\n"
-            "4. **Cơ quan tiếp nhận hồ sơ:**\n"
-            "- Bộ phận Một cửa cấp xã/phường nơi có thửa đất HOẶC Chi nhánh Văn phòng Đăng ký đất đai cấp huyện.\n\n"
-            "5. **Hồ sơ cần chuẩn bị:**\n"
-            "- Đơn xin tách thửa đất (Mẫu số 04/ĐK theo Nghị định 101/2024/NĐ-CP).\n"
-            "- Bản gốc Giấy chứng nhận quyền sử dụng đất đã cấp.\n"
-            "- Bản vẽ trích đo địa chính thửa đất xin tách."
-        )
-    },
-    {
-        "keywords": ["thuế", "lệ phí", "trước bạ", "tncn", "nghĩa vụ tài chính", "phí sang tên", "chi phí chuyển nhượng"],
-        "answer": (
-            "Dạ, chào bạn! Khi thực hiện thủ tục chuyển nhượng quyền sử dụng đất tại tỉnh Thanh Hóa, các bên có nghĩa vụ nộp các khoản tài chính sau:\n\n"
-            "1. **Căn cứ pháp lý áp dụng:**\n"
-            "- Luật Thuế Thu nhập Cá nhân.\n"
-            "- Nghị định số 10/2022/NĐ-CP về Lệ phí trước bạ.\n"
-            "- Nghị định 49/2026/NĐ-CP và Bảng giá đất hiện hành của UBND tỉnh Thanh Hóa.\n\n"
-            "2. **Các khoản thuế và lệ phí bắt buộc:**\n"
-            "- **Thuế Thu nhập Cá nhân (TNCN):** Mức nộp là **2%** trên giá trị chuyển nhượng ghi trong hợp đồng (hoặc theo Bảng giá đất của UBND tỉnh Thanh Hóa nếu giá trong hợp đồng thấp hơn quy định). Thông thường do bên bán nộp, trừ khi có thỏa thuận khác.\n"
-            "- **Lệ phí Trước bạ:** Mức nộp là **0,5%** tính trên Giá trị chuyển quyền sử dụng đất (Diện tích × Giá đất theo Bảng giá đất của tỉnh). Thông thường do bên mua nộp.\n"
-            "- **Phí thẩm định hồ sơ và lệ phí cấp đổi Sổ đỏ:** Từ 500.000đ - 2.000.000đ tùy theo địa bàn huyện/thị.\n\n"
-            "3. **Trường hợp được Miễn thuế TNCN & Lệ phí trước bạ:**\n"
-            "- Chuyển nhượng, tặng cho, thừa kế giữa những người thân thích trong gia đình (Vợ - chồng; Cha/mẹ - con; Ông/bà - cháu; Anh/chị/em ruột) kèm theo giấy tờ chứng minh quan hệ nhân thân (Mẫu số 03/BĐS-TNCN).\n\n"
-            "4. **Cơ quan tiếp nhận và thẩm định:**\n"
-            "- Chi cục Thuế khu vực cấp huyện thông qua Bộ phận Một cửa nơi nộp hồ sơ đăng ký biến động đất đai."
-        )
-    }
-]
-
-def search_fallback_knowledge(question):
-    q_lower = (question or "").lower()
-    best_match = None
-    max_hits = 0
-    for rule in KNOWLEDGE_RULES:
-        hits = sum(1 for kw in rule["keywords"] if kw in q_lower)
-        if hits > max_hits:
-            max_hits = hits
-            best_match = rule["answer"]
-    return best_match if max_hits > 0 else None
-
 def process_question_pipeline(question):
-    """Pipeline: Gemini (Chủ đạo) -> ZenMux (Dự phòng) -> Knowledge Base"""
     ans, model_name = call_gemini_primary(question)
     if ans:
         return ans, model_name
@@ -244,16 +218,76 @@ def process_question_pipeline(question):
     if ans:
         return ans, model_name
 
-    ans = search_fallback_knowledge(question)
-    if ans:
-        return ans, "CSDL Pháp lý Thanh Hóa (QĐ 18/2026 & QĐ 2604)"
-
     return (
         "Dạ, chào bạn! Đối với nội dung bạn quan tâm, tôi xin tư vấn theo quy định hiện hành:\n\n"
         "1. **Căn cứ pháp lý:** Áp dụng Luật Đất đai 2024, Nghị định 101/2024/NĐ-CP, Nghị định 49/2026/NĐ-CP và Quyết định số 18/2026/QĐ-UBND tỉnh Thanh Hóa.\n"
         "2. **Cơ quan tiếp nhận:** Bạn vui lòng liên hệ Bộ phận Một cửa UBND cấp xã/phường nơi có đất hoặc Chi nhánh Văn phòng Đăng ký đất đai cấp huyện để được tiếp nhận hồ sơ trích lục địa chính và thẩm định cụ thể.\n"
         "3. **Hồ sơ cơ bản:** Đơn đăng ký biến động, bản gốc Giấy chứng nhận quyền sử dụng đất, bản sao CCCD và các giấy tờ chứng minh nguồn gốc đất."
     ), "Trợ lý Pháp lý Thanh Hóa"
+
+# ══════════════════════════════════════════════════════════════════
+# GEMINI VISION OCR ENGINE CHO PHÂN HỆ 2
+# ══════════════════════════════════════════════════════════════════
+def extract_ocr_with_gemini_vision(image_base64, mime_type, doc_type="cccd"):
+    prompt = PROMPT_CCCD_EXACT if doc_type == "cccd" else PROMPT_LAND_EXACT
+    gemini_models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+    
+    payload = {
+        "contents": [{
+            "parts": [
+                {"text": prompt},
+                {
+                    "inlineData": {
+                        "mimeType": mime_type,
+                        "data": image_base64
+                    }
+                }
+            ]
+        }],
+        "generationConfig": {
+            "temperature": 0.1,
+            "maxOutputTokens": 2048
+        }
+    }
+    payload_data = json.dumps(payload).encode("utf-8")
+
+    for key in GEMINI_API_KEYS:
+        if not key or len(key) < 10:
+            continue
+        for model in gemini_models:
+            # Protocol 1: x-goog-api-key
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+                req = urllib.request.Request(url, data=payload_data, headers={"Content-Type": "application/json", "x-goog-api-key": key}, method="POST")
+                with urllib.request.urlopen(req, timeout=35) as resp:
+                    res_json = json.loads(resp.read().decode("utf-8"))
+                    candidates = res_json.get("candidates", [])
+                    if candidates:
+                        raw_text = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                        json_m = re.search(r'\{.*\}', raw_text, re.DOTALL)
+                        if json_m:
+                            extracted = json.loads(json_m.group(0))
+                            return extracted, f"Gemini Vision ({model})"
+            except Exception as e:
+                pass
+
+            # Protocol 2: Bearer Authorization
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+                req = urllib.request.Request(url, data=payload_data, headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"}, method="POST")
+                with urllib.request.urlopen(req, timeout=35) as resp:
+                    res_json = json.loads(resp.read().decode("utf-8"))
+                    candidates = res_json.get("candidates", [])
+                    if candidates:
+                        raw_text = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                        json_m = re.search(r'\{.*\}', raw_text, re.DOTALL)
+                        if json_m:
+                            extracted = json.loads(json_m.group(0))
+                            return extracted, f"Gemini Vision ({model})"
+            except Exception as e:
+                pass
+
+    return {}, "Không thể bóc tách"
 
 # ══════════════════════════════════════════════════════════════════
 # API ROUTES
@@ -266,8 +300,9 @@ def health():
         "status": "online",
         "service": "ThanhHoa Land AI v2026",
         "api_chat": "/api/chat [POST]",
+        "api_ocr": "/api/ocr/scan [POST]",
         "telegram": "@TroLyLuatbot",
-        "primary_model": "Google Gemini Flash (Primary) + Multi-Auth",
+        "primary_model": "Google Gemini Flash + Vision OCR",
         "prompt": "Tro Ly Phap Ly & Dat Dai Thanh Hoa Chuyen Nghiep"
     }), 200
 
@@ -283,7 +318,7 @@ def api_chat():
     if not question:
         return jsonify({"error": "Vui lòng nhập câu hỏi"}), 400
 
-    print(f"📥 [Web] {session_id}: {question[:80]}")
+    print(f"📥 [Web Chat] {session_id}: {question[:80]}")
     answer, model_used = process_question_pipeline(question)
 
     return jsonify({
@@ -291,6 +326,110 @@ def api_chat():
         "model": f"🤖 {model_used}",
         "session_id": session_id,
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+    }), 200
+
+# ══════════════════════════════════════════════════════════════════
+# API OCR SCAN BÓC TÁCH CCCD & GCN (SỔ ĐỎ)
+# ══════════════════════════════════════════════════════════════════
+@app.route('/api/ocr/scan', methods=['POST', 'OPTIONS'])
+def api_ocr():
+    if request.method == 'OPTIONS':
+        return jsonify({"status": "ok"}), 200
+
+    doc_type = request.form.get("doc_type", "cccd").lower()
+    file = request.files.get("file")
+    if not file:
+        files = request.files.getlist("files")
+        if files:
+            file = files[0]
+
+    if not file:
+        return jsonify({"success": False, "message": "Không tìm thấy file ảnh tải lên."}), 400
+
+    content = file.read()
+    if not content:
+        return jsonify({"success": False, "message": "File ảnh rỗng."}), 400
+
+    mime_type = file.mimetype or "image/jpeg"
+    if content[:2] == b'\xff\xd8':
+        mime_type = "image/jpeg"
+    elif content[:8] == b'\x89PNG\r\n\x1a\n':
+        mime_type = "image/png"
+    elif content[:4] == b'RIFF' and content[8:12] == b'WEBP':
+        mime_type = "image/webp"
+
+    b64_image = base64.b64encode(content).decode("utf-8")
+    data_url = f"data:{mime_type};base64,{b64_image}"
+
+    print(f"📷 [OCR Scan] Nhận ảnh {doc_type} ({len(content)} bytes), đang bóc tách qua Gemini Vision...")
+    extracted_raw, ocr_model = extract_ocr_with_gemini_vision(b64_image, mime_type, doc_type=doc_type)
+
+    # Chuẩn hóa và làm phẳng các trường dữ liệu để khớp 100% với form web
+    extracted_data = {}
+    if isinstance(extracted_raw, dict):
+        for k, v in extracted_raw.items():
+            if isinstance(v, dict):
+                for sub_k, sub_v in v.items():
+                    extracted_data[sub_k] = sub_v
+            else:
+                extracted_data[k] = v
+
+    # Tạo thêm các alias phổ biến để form frontend bắt chính xác
+    if doc_type == "cccd":
+        if "id_number" in extracted_data:
+            extracted_data["so_cccd"] = extracted_data["id_number"]
+            extracted_data["cccd_so"] = extracted_data["id_number"]
+        if "full_name" in extracted_data:
+            extracted_data["ho_va_ten"] = extracted_data["full_name"]
+            extracted_data["cccd_hoten"] = extracted_data["full_name"]
+        if "date_of_birth" in extracted_data:
+            extracted_data["ngay_sinh"] = extracted_data["date_of_birth"]
+            extracted_data["cccd_ngaysinh"] = extracted_data["date_of_birth"]
+        if "date_of_issue" in extracted_data:
+            extracted_data["ngay_cap"] = extracted_data["date_of_issue"]
+            extracted_data["cccd_ngaycap"] = extracted_data["date_of_issue"]
+        if "sex" in extracted_data:
+            extracted_data["gioi_tinh"] = extracted_data["sex"]
+            extracted_data["cccd_gioitinh"] = extracted_data["sex"]
+        if "place_of_origin" in extracted_data:
+            extracted_data["que_quan"] = extracted_data["place_of_origin"]
+            extracted_data["cccd_quequan"] = extracted_data["place_of_origin"]
+        if "place_of_residence" in extracted_data:
+            extracted_data["noi_thuong_tru"] = extracted_data["place_of_residence"]
+            extracted_data["cccd_thuongtru"] = extracted_data["place_of_residence"]
+    else:
+        # GCN Sổ đỏ
+        if "certificate_serial_number" in extracted_data:
+            extracted_data["land_sophathanh"] = extracted_data["certificate_serial_number"]
+        if "registration_book_number" in extracted_data:
+            extracted_data["land_sovaoso"] = extracted_data["registration_book_number"]
+        if "date_of_issue" in extracted_data:
+            extracted_data["land_ngaycap"] = extracted_data["date_of_issue"]
+        if "place_of_issue" in extracted_data:
+            extracted_data["land_noicap"] = extracted_data["place_of_issue"]
+        if "parcel_number" in extracted_data:
+            extracted_data["land_thua"] = extracted_data["parcel_number"]
+        if "map_sheet_number" in extracted_data:
+            extracted_data["land_tobando"] = extracted_data["map_sheet_number"]
+        if "parcel_address" in extracted_data:
+            extracted_data["land_diachi"] = extracted_data["parcel_address"]
+        if "area_number" in extracted_data:
+            extracted_data["land_dientich"] = extracted_data["area_number"]
+        if "purpose_of_use" in extracted_data:
+            extracted_data["land_mucdich"] = extracted_data["purpose_of_use"]
+        if "time_of_use" in extracted_data:
+            extracted_data["land_thoihan"] = extracted_data["time_of_use"]
+        if "owner_name" in extracted_data:
+            extracted_data["chu_su_dung"] = extracted_data["owner_name"]
+
+    print(f"✅ [OCR Kết Quả] {doc_type}: {len(extracted_data)} trường dữ liệu được trích xuất thành công!")
+
+    return jsonify({
+        "success": True if extracted_data else False,
+        "doc_type": doc_type,
+        "ocr_model": ocr_model,
+        "data_urls": [data_url],
+        "extracted_data": extracted_data
     }), 200
 
 # ══════════════════════════════════════════════════════════════════
@@ -335,12 +474,6 @@ def zalo_webhook():
             return challenge, 200
         return jsonify({"status": "active"}), 200
     return jsonify({"status": "received"}), 200
-
-@app.route('/api/ocr/scan', methods=['POST', 'OPTIONS'])
-def api_ocr():
-    if request.method == 'OPTIONS':
-        return jsonify({"status": "ok"}), 200
-    return jsonify({"success": False, "message": "OCR khả dụng trên máy trạm cục bộ."}), 200
 
 @app.route('/api/export/docx', methods=['POST', 'OPTIONS'])
 def api_export_docx():
