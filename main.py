@@ -34,7 +34,7 @@ def add_cors(response):
     return response
 
 # ══════════════════════════════════════════════════════════════════
-# CẤU HÌNH API KEYS & TOKENS
+# CẤU HÌNH API KEYS (GEMINI LÀ CHỦ ĐẠO - XOAY VÒNG 3 KEYS)
 # ══════════════════════════════════════════════════════════════════
 GEMINI_API_KEYS = [
     os.environ.get("GEMINI_API_KEY_1", "AQ.Ab8RN6K6uWSGUAgNhZthfDN38a9tSvzF8RyiaRNvzLTpR6WesA"),
@@ -46,125 +46,90 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8128444329:AAEtIfC86t
 ZALO_BOT_TOKEN = os.environ.get("ZALO_BOT_TOKEN", "EfVUmLxWFIMXorvotNYxHBWEBJDGOVHLvbAFCEViZpdjqmijKlHUOdesfyYaOqLD")
 
 # ══════════════════════════════════════════════════════════════════
-# CƠ SỞ DỮ LIỆU PHÁP LÝ CHUYÊN SÂU TỈNH THANH HÓA (IN-MEMORY RAG)
+# SYSTEM PROMPT CHUẨN CỦA TRỢ LÝ PHÁP LÝ & ĐẤT ĐAI THANH HÓA
 # ══════════════════════════════════════════════════════════════════
-KNOWLEDGE_RULES = [
-    {
-        "keywords": ["tách thửa", "diện tích tối thiểu", "hạn mức tách", "chia đất", "tách sổ", "tách đất"],
-        "answer": (
-            "### 🏛️ Quy định về Hạn mức & Điều kiện Tách thửa Đất ở tỉnh Thanh Hóa\n\n"
-            "Căn cứ **Luật Đất đai 2024 (Điều 220)** và **Quyết định số 18/2026/QĐ-UBND** của UBND tỉnh Thanh Hóa:\n\n"
-            "#### 1️⃣ Diện tích và Kích thước tối thiểu được phép tách thửa đất ở:\n"
-            "* **Tại các Phường (Đô thị):**\n"
-            "  - Diện tích tối thiểu: **≥ 40 m²**\n"
-            "  - Chiều rộng mặt tiền và chiều sâu: **≥ 3,0 m**\n"
-            "* **Tại các Xã thuộc khu vực Đồng bằng, Trung du & Ven biển:**\n"
-            "  - Diện tích tối thiểu: **≥ 40 m²**\n"
-            "  - Chiều rộng mặt tiền và chiều sâu: **≥ 4,0 m**\n"
-            "* **Tại các Xã thuộc 11 huyện Miền núi Thanh Hóa:**\n"
-            "  - Diện tích tối thiểu: **≥ 50 m²**\n"
-            "  - Chiều rộng mặt tiền và chiều sâu: **≥ 5,0 m**\n\n"
-            "#### 2️⃣ Đối với Đất Nông nghiệp:\n"
-            "* Đất trồng cây lâu năm, hàng năm: **≥ 500 m²**\n"
-            "* Đất trồng lúa: **≥ 1.000 m²**\n"
-            "* Đất rừng sản xuất: **≥ 3.000 m²**\n\n"
-            "#### 3️⃣ Điều kiện bắt buộc khi tách thửa:\n"
-            "1. Thửa đất đã được cấp Giấy chứng nhận (Sổ đỏ/Sổ hồng).\n"
-            "2. Thửa đất không có tranh chấp, không bị kê biên để thi hành án.\n"
-            "3. Thửa đất còn trong thời hạn sử dụng đất.\n"
-            "4. Thửa đất mới hình thành và thửa đất còn lại sau khi tách phải có lối đi kết nối với đường giao thông công cộng hiện có."
-        )
-    },
-    {
-        "keywords": ["thuế", "lệ phí", "trước bạ", "tncn", "nghĩa vụ tài chính", "tiền sử dụng đất", "phí sang tên", "chi phí chuyển nhượng"],
-        "answer": (
-            "### 💰 Nghĩa vụ Tài chính khi Chuyển nhượng / Cấp GCN Đất đai\n\n"
-            "Căn cứ **Luật Thuế TNCN**, **Nghị định 10/2022/NĐ-CP**, **Nghị định 49/2026/NĐ-CP** và Bảng giá đất tỉnh Thanh Hóa:\n\n"
-            "#### 1️⃣ Thuế Thu nhập Cá nhân (TNCN) khi chuyển nhượng BĐS:\n"
-            "* **Mức thuế:** **2%** trên giá trị chuyển nhượng ghi trong hợp đồng (hoặc theo Bảng giá đất của UBND tỉnh Thanh Hóa nếu giá hợp đồng thấp hơn).\n"
-            "* **Miễn thuế:** Chuyển nhượng, tặng cho, thừa kế giữa những người có quan hệ huyết thống, hôn nhân (Vợ - chồng; Cha/mẹ - con; Ông/bà - cháu; Anh/chị/em ruột) theo Mẫu số 03/BĐS-TNCN.\n\n"
-            "#### 2️⃣ Lệ phí Trước bạ nhà đất:\n"
-            "* **Mức nộp:** **0,5%** tính trên Giá trị quyền sử dụng đất (Diện tích × Giá đất theo Bảng giá đất tỉnh Thanh Hóa).\n"
-            "* **Miễn lệ phí:** Tặng cho, thừa kế giữa người thân ruột thịt theo quy định.\n\n"
-            "#### 3️⃣ Các khoản phí & lệ phí khác:\n"
-            "* **Phí thẩm định hồ sơ:** Từ 500.000đ - 2.000.000đ tùy diện tích và địa bàn huyện/thị.\n"
-            "* **Lệ phí cấp đổi/cấp mới GCN:** 50.000đ - 100.000đ/GCN.\n"
-            "* **Phí trích đo địa chính:** (Nếu phải đo đạc chỉnh lý thửa đất)."
-        )
-    },
-    {
-        "keywords": ["cấp sổ", "cấp gcn", "lần đầu", "hồ sơ cấp gcn", "thủ tục cấp sổ đỏ", "chưa có sổ", "mẫu 29"],
-        "answer": (
-            "### 📋 Thủ tục & Hồ sơ Cấp Giấy chứng nhận (Sổ đỏ) Lần đầu tỉnh Thanh Hóa\n\n"
-            "Căn cứ **Luật Đất đai 2024 (Điều 138-140)**, **Nghị định 101/2024/NĐ-CP** và **Quyết định số 2604/QĐ-VP** tỉnh Thanh Hóa:\n\n"
-            "#### 1️⃣ Thành phần Hồ sơ cần chuẩn bị:\n"
-            "1. **Đơn đăng ký, cấp Giấy chứng nhận:** Mẫu số **04/ĐK** (theo NĐ 101/2024) hoặc Mẫu số 29 (theo QĐ 2604).\n"
-            "2. **Giấy tờ chứng minh nguồn gốc sử dụng đất:** Một trong các loại giấy tờ quy định tại Điều 137 Luật Đất đai 2024 (giấy tờ trước 15/10/1993, giấy tờ giao đất đúng/không đúng thẩm quyền...).\n"
-            "3. **Sơ đồ trích đo địa chính thửa đất** do đơn vị đo đạc có tư cách pháp nhân lập hoặc do Chi nhánh VPĐKĐĐ trích lục.\n"
-            "4. **Tờ khai nghĩa vụ tài chính:** Tờ khai Lệ phí trước bạ (Mẫu 01/LPTB), Tờ khai Tiền sử dụng đất.\n"
-            "5. Bản sao CCCD, Giấy xác nhận tình trạng hôn nhân của người sử dụng đất.\n\n"
-            "#### 2️⃣ Nơi nộp hồ sơ & Thời hạn giải quyết:\n"
-            "* **Nơi nộp:** Bộ phận Một cửa UBND cấp xã nơi có đất HOẶC Trung tâm Hành chính công / Chi nhánh VPĐKĐĐ cấp huyện.\n"
-            "* **Thời hạn giải quyết:** Không quá **30 ngày làm việc** (đối với miền núi không quá 40 ngày làm việc)."
-        )
-    },
-    {
-        "keywords": ["thẩm quyền", "ai cấp", "ubnd xã", "sở tài nguyên", "văn phòng đăng ký", "chi nhánh", "phân cấp"],
-        "answer": (
-            "### 🏛️ Thẩm quyền Cấp Giấy chứng nhận (GCN) theo Quyết định 2604/QĐ-VP tỉnh Thanh Hóa\n\n"
-            "Căn cứ **Điều 136 Luật Đất đai 2024** và quy định phân cấp tại **Quyết định 2604/QĐ-VP**:\n\n"
-            "#### 1️⃣ Thẩm quyền cấp GCN lần đầu:\n"
-            "* **UBND cấp huyện:** Cấp GCN lần đầu cho cá nhân, hộ gia đình, cộng đồng dân cư trong nước.\n"
-            "* **UBND cấp tỉnh (hoặc ủy quyền cho Sở TN&MT):** Cấp GCN cho tổ chức trong nước, tổ chức tôn giáo, người gốc Việt Nam định cư ở nước ngoài, tổ chức có vốn đầu tư nước ngoài.\n\n"
-            "#### 2️⃣ Thẩm quyền cấp GCN khi đăng ký biến động (chuyển nhượng, tặng cho, tách thửa, cấp đổi, cấp lại):\n"
-            "* **Chi nhánh Văn phòng Đăng ký đất đai cấp huyện:** Thực hiện cấp đổi, cấp lại, đăng ký biến động cho cá nhân, hộ gia đình.\n"
-            "* **Văn phòng Đăng ký đất đai tỉnh Thanh Hóa:** Thực hiện cho các tổ chức, doanh nghiệp."
-        )
-    },
-    {
-        "keywords": ["chuyển mục đích", "lên thổ cư", "đất vườn", "đất nông nghiệp sang đất ở", "chuyển đất nông nghiệp"],
-        "answer": (
-            "### 🔄 Thủ tục & Tiền sử dụng đất khi Chuyển mục đích sang Đất ở (Thổ cư)\n\n"
-            "Căn cứ **Luật Đất đai 2024 (Điều 121, 122)** và **Nghị định 49/2026/NĐ-CP**:\n\n"
-            "#### 1️⃣ Điều kiện cho phép chuyển mục đích:\n"
-            "1. Phù hợp với **Quy hoạch sử dụng đất cấp huyện** đã được UBND tỉnh Thanh Hóa phê duyệt.\n"
-            "2. Có đơn xin chuyển mục đích sử dụng đất theo quy định.\n\n"
-            "#### 2️⃣ Cách tính Tiền sử dụng đất phải nộp:\n"
-            "$$\\text{Tiền sử dụng đất} = \\text{Giá đất ở theo Bảng giá đất} - \\text{Giá đất nông nghiệp tương ứng}$$\n"
-            "* Tính theo Bảng giá đất hiện hành của UBND tỉnh Thanh Hóa nhân với diện tích xin chuyển mục đích.\n\n"
-            "#### 3️⃣ Hồ sơ nộp tại:\n"
-            "* Phòng Tài nguyên và Môi trường / Trung tâm Phục vụ hành chính công cấp huyện nơi có đất."
-        )
-    }
-]
+SYSTEM_PROMPT = """Bạn là 'Trợ lý Pháp lý & Đất đai Thanh Hóa' chuyên nghiệp, tận tâm, chính xác.
 
-def search_local_rules(question):
-    q_lower = (question or "").lower()
-    best_match = None
-    max_hits = 0
-    for rule in KNOWLEDGE_RULES:
-        hits = sum(1 for kw in rule["keywords"] if kw in q_lower)
-        if hits > max_hits:
-            max_hits = hits
-            best_match = rule["answer"]
-    return best_match if max_hits > 0 else None
+Nhiệm vụ:
+Tư vấn, giải đáp pháp luật đất đai, thủ tục cấp giấy chứng nhận (Sổ đỏ), tách thửa, hợp thửa, chuyển mục đích sử dụng đất, thuế và nghĩa vụ tài chính, tranh chấp đất đai theo Luật Đất đai 2024, các Nghị định hướng dẫn thi hành (Nghị định 101/2024/NĐ-CP, Nghị định 49/2026/NĐ-CP, v.v.) và quy định của UBND tỉnh Thanh Hóa (Quyết định 18/2026/QĐ-UBND, Quyết định 2604/QĐ-VP).
+
+Phong cách và quy chuẩn trả lời:
+1. Rõ ràng, ngắn gọn, dễ hiểu, trình bày có gạch đầu dòng hoặc số thứ tự từng bước cụ thể.
+2. Nêu rõ căn cứ pháp lý áp dụng (Luật Đất đai 2024, các Nghị định, Quyết định liên quan).
+3. Hướng dẫn cụ thể cơ quan có thẩm quyền tiếp nhận hồ sơ (Bộ phận Một cửa cấp xã/phường hoặc Chi nhánh Văn phòng Đăng ký Đất đai nơi có đất).
+4. Liệt kê rõ các thành phần hồ sơ, giấy tờ người dân cần chuẩn bị.
+5. Giữ thái độ lịch sự, ân cần, chuẩn mực của cán bộ tư vấn pháp luật.
+
+DỮ LIỆU ĐẶC BIỆT CẦN NẮM VỮNG VỀ TỈNH THANH HÓA:
+- Tách thửa đất ở theo QĐ 18/2026/QĐ-UBND:
+  + Phường (đô thị): diện tích >= 40m2, mặt tiền và chiều sâu >= 3.0m
+  + Xã đồng bằng, trung du: diện tích >= 40m2, mặt tiền và chiều sâu >= 4.0m
+  + Xã miền núi: diện tích >= 50m2, mặt tiền và chiều sâu >= 5.0m
+  + Đất nông nghiệp: CLN, BHK >= 500m2; Đất lúa >= 1000m2; Đất rừng >= 3000m2
+- Nghĩa vụ tài chính: Thuế TNCN chuyển nhượng 2%, Lệ phí trước bạ 0.5%
+- Thẩm quyền cấp GCN theo QĐ 2604/QĐ-VP: Cấp xã tiếp nhận & xác nhận hiện trạng; Chi nhánh VPĐKĐĐ cấp huyện thẩm định và cấp đổi/cấp lại/biến động cho cá nhân; UBND cấp huyện cấp lần đầu."""
 
 # ══════════════════════════════════════════════════════════════════
-# AI ENGINE - GEMINI & ZENMUX MULTI-TIER
+# AI ENGINE - GEMINI LÀ CHỦ ĐẠO -> DỰ PHÒNG ZENMUX -> DỰ PHÒNG KNOWLEDGE
 # ══════════════════════════════════════════════════════════════════
-SYSTEM_PROMPT = """Bạn là Chuyên gia Trợ lý AI Pháp lý Đất đai tỉnh Thanh Hóa (ThanhHoa Land AI).
+def call_gemini_primary(question):
+    """Ưu tiên số 1: Gọi Gemini API xoay vòng qua 3 API Keys và các model mới nhất."""
+    gemini_models = [
+        "gemini-2.0-flash",
+        "gemini-1.5-flash",
+        "gemini-1.5-pro",
+        "gemini-2.0-flash-lite",
+        "gemini-flash-latest"
+    ]
+    
+    for idx, key in enumerate(GEMINI_API_KEYS):
+        if not key or len(key) < 10:
+            continue
+        key_label = f"Key #{idx+1}"
+        for model in gemini_models:
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
+                payload = json.dumps({
+                    "contents": [{
+                        "parts": [{"text": f"{SYSTEM_PROMPT}\n\n[CÂU HỎI CỦA NGƯỜI DÂN]:\n{question}\n\n[TRẢ LỜI (100% TIẾNG VIỆT CHUẨN MỰC)]:"}]
+                    }],
+                    "generationConfig": {
+                        "temperature": 0.2,
+                        "maxOutputTokens": 3000
+                    }
+                }).encode("utf-8")
+                
+                req = urllib.request.Request(
+                    url,
+                    data=payload,
+                    headers={"Content-Type": "application/json", "x-goog-api-key": key},
+                    method="POST"
+                )
+                with urllib.request.urlopen(req, timeout=25) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        if parts and parts[0].get("text", "").strip():
+                            ans = parts[0]["text"].strip()
+                            print(f"✅ Gemini API {key_label} ({model}) trả lời thành công!")
+                            return ans, f"Google Gemini Flash ({model})"
+            except Exception as e:
+                print(f"⚠️ Gemini {key_label} model {model} lỗi/quota: {e}")
+                continue
 
-QUY CHUẨN TRẢ LỜI BẮT BUỘC:
-1. BẮT BUỘC trả lời 100% bằng TIẾNG VIỆT CHUẨN MỰC, đúng thuật ngữ pháp lý.
-2. Trình bày rõ ràng theo từng phần:
-   - 🏛️ Căn cứ pháp lý: Luật Đất đai 2024, NĐ 101/2024, NĐ 102/2024, NĐ 49/2026, Quyết định 18/2026/QĐ-UBND và Quyết định 2604/QĐ-VP tỉnh Thanh Hóa.
-   - 📋 Quy định cụ thể và hạn mức chi tiết.
-   - 📝 Hướng dẫn các bước nộp hồ sơ, giấy tờ cần chuẩn bị.
-3. Luôn bám sát địa bàn 27 huyện, thị xã, thành phố của tỉnh Thanh Hóa."""
+    return None, None
 
-def call_ai_cloud(question):
-    # 1. Thử ZenMux Multi-Model Gateway
-    zenmux_models = ["deepseek/deepseek-chat", "z-ai/glm-5.3-free", "dots-studio/dots3-note-prev"]
+def call_zenmux_backup(question):
+    """Ưu tiên số 2: Chỉ khi tất cả Gemini Keys hết quota mới chuyển sang ZenMux."""
+    if not ZENMUX_API_KEY:
+        return None, None
+        
+    zenmux_models = [
+        "deepseek/deepseek-chat",
+        "z-ai/glm-5.3-free",
+        "dots-studio/dots3-note-prev"
+    ]
     for m in zenmux_models:
         try:
             url = "https://zenmux.ai/api/v1/chat/completions"
@@ -176,64 +141,108 @@ def call_ai_cloud(question):
                 ],
                 "temperature": 0.2
             }).encode("utf-8")
-            req = urllib.request.Request(url, data=payload, headers={
-                "Authorization": f"Bearer {ZENMUX_API_KEY}",
-                "Content-Type": "application/json"
-            }, method="POST")
+            req = urllib.request.Request(
+                url,
+                data=payload,
+                headers={"Authorization": f"Bearer {ZENMUX_API_KEY}", "Content-Type": "application/json"},
+                method="POST"
+            )
             with urllib.request.urlopen(req, timeout=30) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 ans = data["choices"][0]["message"]["content"].strip()
                 ans = re.sub(r'<think>.*?</think>', '', ans, flags=re.DOTALL).strip()
                 if len(ans) > 20:
-                    return ans, f"ZenMux Cloud ({m})"
+                    print(f"✅ ZenMux Backup ({m}) phản hồi thành công!")
+                    return ans, f"ZenMux AI Gateway ({m})"
         except Exception as e:
-            print(f"⚠️ ZenMux {m} error: {e}")
+            print(f"⚠️ ZenMux backup {m} lỗi: {e}")
             continue
-
-    # 2. Thử Gemini API
-    for key in GEMINI_API_KEYS:
-        if not key or len(key) < 10:
-            continue
-        for model in ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]:
-            try:
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
-                payload = json.dumps({
-                    "contents": [{"parts": [{"text": f"{SYSTEM_PROMPT}\n\nCÂU HỎI: {question}\n\nTRẢ LỜI (100% Tiếng Việt):"}]}],
-                    "generationConfig": {"temperature": 0.2, "maxOutputTokens": 2048}
-                }).encode("utf-8")
-                req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"}, method="POST")
-                with urllib.request.urlopen(req, timeout=25) as resp:
-                    data = json.loads(resp.read().decode("utf-8"))
-                    candidates = data.get("candidates", [])
-                    if candidates:
-                        parts = candidates[0].get("content", {}).get("parts", [])
-                        if parts and parts[0].get("text", "").strip():
-                            return parts[0]["text"].strip(), f"Gemini Cloud ({model})"
-            except Exception as e:
-                print(f"⚠️ Gemini {model} error: {e}")
-                continue
 
     return None, None
 
-def process_question(question):
-    # Ưu tiên 1: Tra cứu CSDL Pháp lý Thanh Hóa chuẩn xác
-    local_ans = search_local_rules(question)
-    if local_ans:
-        return local_ans, "CSDL Pháp lý Thanh Hóa (QĐ 18/2026 & QĐ 2604)"
+# ══════════════════════════════════════════════════════════════════
+# DỮ LIỆU CỐ ĐỊNH THANH HÓA (DỰ PHÒNG KHI MẤT MẠNG / KHẨN CẤP)
+# ══════════════════════════════════════════════════════════════════
+KNOWLEDGE_RULES = [
+    {
+        "keywords": ["tách thửa", "diện tích tối thiểu", "hạn mức tách", "chia đất", "tách sổ", "tách đất"],
+        "answer": (
+            "Dạ, chào bạn! Về điều kiện và hạn mức tách thửa đất ở tại tỉnh Thanh Hóa, tôi xin tư vấn chi tiết như sau:\n\n"
+            "1. **Căn cứ pháp lý áp dụng:**\n"
+            "- Điều 220 Luật Đất đai 2024.\n"
+            "- Quyết định số 18/2026/QĐ-UBND của UBND tỉnh Thanh Hóa quy định về hạn mức giao đất, diện tích tối thiểu được phép tách thửa.\n\n"
+            "2. **Diện tích và kích thước tối thiểu được phép tách thửa đất ở:**\n"
+            "- **Tại các Phường thuộc Đô thị:** Diện tích tối thiểu **≥ 40 m²**, chiều rộng mặt tiền và chiều sâu **≥ 3,0 m**.\n"
+            "- **Tại các Xã thuộc khu vực Đồng bằng, Trung du & Ven biển:** Diện tích tối thiểu **≥ 40 m²**, chiều rộng mặt tiền và chiều sâu **≥ 4,0 m**.\n"
+            "- **Tại các Xã thuộc 11 huyện Miền núi Thanh Hóa:** Diện tích tối thiểu **≥ 50 m²**, chiều rộng mặt tiền và chiều sâu **≥ 5,0 m**.\n"
+            "- **Đất nông nghiệp:** Đất trồng cây lâu năm/hàng năm **≥ 500 m²**; Đất trồng lúa **≥ 1.000 m²**; Đất rừng sản xuất **≥ 3.000 m²**.\n\n"
+            "3. **Điều kiện bắt buộc khác:**\n"
+            "- Thửa đất đã có Giấy chứng nhận quyền sử dụng đất.\n"
+            "- Đất không có tranh chấp, không bị kê biên thi hành án, còn thời hạn sử dụng.\n"
+            "- Thửa đất mới hình thành và phần còn lại sau khi tách bắt buộc phải có lối đi kết nối với đường giao thông công cộng.\n\n"
+            "4. **Cơ quan tiếp nhận hồ sơ:**\n"
+            "- Bộ phận Một cửa cấp xã/phường nơi có thửa đất HOẶC Chi nhánh Văn phòng Đăng ký đất đai cấp huyện.\n\n"
+            "5. **Hồ sơ cần chuẩn bị:**\n"
+            "- Đơn xin tách thửa đất (Mẫu số 04/ĐK theo Nghị định 101/2024/NĐ-CP).\n"
+            "- Bản gốc Giấy chứng nhận quyền sử dụng đất đã cấp.\n"
+            "- Bản vẽ trích đo địa chính thửa đất xin tách."
+        )
+    },
+    {
+        "keywords": ["thuế", "lệ phí", "trước bạ", "tncn", "nghĩa vụ tài chính", "phí sang tên", "chi phí chuyển nhượng"],
+        "answer": (
+            "Dạ, chào bạn! Khi thực hiện thủ tục chuyển nhượng quyền sử dụng đất tại tỉnh Thanh Hóa, các bên có nghĩa vụ nộp các khoản tài chính sau:\n\n"
+            "1. **Căn cứ pháp lý áp dụng:**\n"
+            "- Luật Thuế Thu nhập Cá nhân.\n"
+            "- Nghị định số 10/2022/NĐ-CP về Lệ phí trước bạ.\n"
+            "- Nghị định 49/2026/NĐ-CP và Bảng giá đất hiện hành của UBND tỉnh Thanh Hóa.\n\n"
+            "2. **Các khoản thuế và lệ phí bắt buộc:**\n"
+            "- **Thuế Thu nhập Cá nhân (TNCN):** Mức nộp là **2%** trên giá trị chuyển nhượng ghi trong hợp đồng (hoặc theo Bảng giá đất của UBND tỉnh Thanh Hóa nếu giá trong hợp đồng thấp hơn quy định). Thông thường do bên bán nộp, trừ khi có thỏa thuận khác.\n"
+            "- **Lệ phí Trước bạ:** Mức nộp là **0,5%** tính trên Giá trị chuyển quyền sử dụng đất (Diện tích × Giá đất theo Bảng giá đất của tỉnh). Thông thường do bên mua nộp.\n"
+            "- **Phí thẩm định hồ sơ và lệ phí cấp đổi Sổ đỏ:** Từ 500.000đ - 2.000.000đ tùy theo địa bàn huyện/thị.\n\n"
+            "3. **Trường hợp được Miễn thuế TNCN & Lệ phí trước bạ:**\n"
+            "- Chuyển nhượng, tặng cho, thừa kế giữa những người thân thích trong gia đình (Vợ - chồng; Cha/mẹ - con; Ông/bà - cháu; Anh/chị/em ruột) kèm theo giấy tờ chứng minh quan hệ nhân thân (Mẫu số 03/BĐS-TNCN).\n\n"
+            "4. **Cơ quan tiếp nhận và thẩm định:**\n"
+            "- Chi cục Thuế khu vực cấp huyện thông qua Bộ phận Một cửa nơi nộp hồ sơ đăng ký biến động đất đai."
+        )
+    }
+]
 
-    # Ưu tiên 2: Gọi AI Cloud (ZenMux / Gemini)
-    ai_ans, model_name = call_ai_cloud(question)
-    if ai_ans:
-        return ai_ans, model_name
+def search_fallback_knowledge(question):
+    q_lower = (question or "").lower()
+    best_match = None
+    max_hits = 0
+    for rule in KNOWLEDGE_RULES:
+        hits = sum(1 for kw in rule["keywords"] if kw in q_lower)
+        if hits > max_hits:
+            max_hits = hits
+            best_match = rule["answer"]
+    return best_match if max_hits > 0 else None
 
-    # Dự phòng
+def process_question_pipeline(question):
+    """Pipeline xử lý: Gemini (Chủ đạo) -> ZenMux (Dự phòng) -> Knowledge Base"""
+    # 1. CHỦ ĐẠO: Gọi Gemini API với các model phân tích sâu
+    ans, model_name = call_gemini_primary(question)
+    if ans:
+        return ans, model_name
+
+    # 2. DỰ PHÒNG 1: Gọi ZenMux khi Gemini hết token
+    ans, model_name = call_zenmux_backup(question)
+    if ans:
+        return ans, model_name
+
+    # 3. DỰ PHÒNG 2: Tra cứu CSDL chuẩn Thanh Hóa
+    ans = search_fallback_knowledge(question)
+    if ans:
+        return ans, "CSDL Pháp lý Thanh Hóa (QĐ 18/2026 & QĐ 2604)"
+
+    # 4. Phản hồi định hướng chuẩn mực
     return (
-        "### 🏛️ Tư vấn Pháp lý Đất đai Thanh Hóa\n"
-        "Đối với câu hỏi của bạn, theo quy định của **Luật Đất đai 2024**, **Quyết định 18/2026/QĐ-UBND** và **Quyết định 2604/QĐ-VP** tỉnh Thanh Hóa:\n\n"
-        "1. Người sử dụng đất cần nộp hồ sơ tại **Bộ phận Một cửa UBND cấp xã** hoặc **Chi nhánh Văn phòng Đăng ký đất đai** nơi có thửa đất.\n"
-        "2. Cán bộ địa chính sẽ tiếp nhận, kiểm tra trích lục bản đồ địa chính và thẩm định thực địa.\n"
-        "3. Sau khi hoàn thành nghĩa vụ tài chính (thuế, lệ phí), cơ quan có thẩm quyền sẽ cấp Giấy chứng nhận theo thời hạn quy định."
-    ), "Hệ thống Pháp lý Thanh Hóa"
+        "Dạ, chào bạn! Đối với nội dung bạn quan tâm, tôi xin tư vấn theo quy định hiện hành:\n\n"
+        "1. **Căn cứ pháp lý:** Áp dụng Luật Đất đai 2024, Nghị định 101/2024/NĐ-CP, Nghị định 49/2026/NĐ-CP và Quyết định số 18/2026/QĐ-UBND tỉnh Thanh Hóa.\n"
+        "2. **Cơ quan tiếp nhận:** Bạn vui lòng liên hệ Bộ phận Một cửa UBND cấp xã/phường nơi có đất hoặc Chi nhánh Văn phòng Đăng ký đất đai cấp huyện để được tiếp nhận hồ sơ trích lục địa chính và thẩm định cụ thể.\n"
+        "3. **Hồ sơ cơ bản:** Đơn đăng ký biến động, bản gốc Giấy chứng nhận quyền sử dụng đất, bản sao CCCD và các giấy tờ chứng minh nguồn gốc đất."
+    ), "Trợ lý Pháp lý Thanh Hóa"
 
 # ══════════════════════════════════════════════════════════════════
 # API ROUTES
@@ -247,7 +256,8 @@ def health():
         "service": "ThanhHoa Land AI v2026",
         "api_chat": "/api/chat [POST]",
         "telegram": "@TroLyLuatbot",
-        "model": "Knowledge RAG + ZenMux + Gemini Multi-Tier"
+        "primary_model": "Google Gemini Flash (Primary) + ZenMux (Fallback)",
+        "prompt": "Tro Ly Phap Ly & Dat Dai Thanh Hoa Chuyen Nghiep"
     }), 200
 
 @app.route('/api/chat', methods=['GET', 'POST', 'OPTIONS'])
@@ -263,7 +273,7 @@ def api_chat():
         return jsonify({"error": "Vui lòng nhập câu hỏi"}), 400
 
     print(f"📥 [Web] {session_id}: {question[:80]}")
-    answer, model_used = process_question(question)
+    answer, model_used = process_question_pipeline(question)
 
     return jsonify({
         "answer": answer,
@@ -299,9 +309,9 @@ def telegram_webhook():
         if chat_id and text:
             def _reply():
                 if text == "/start":
-                    send_telegram(chat_id, "👋 Xin chào! Tôi là Trợ lý AI Pháp lý Đất đai Thanh Hóa (@TroLyLuatbot). Hãy đặt câu hỏi về thủ tục đất đai, tách thửa, cấp sổ...")
+                    send_telegram(chat_id, "👋 Xin chào! Tôi là Trợ lý Pháp lý & Đất đai Thanh Hóa (@TroLyLuatbot).\nTôi sẵn sàng tư vấn chi tiết về thủ tục cấp Sổ đỏ, tách thửa, chuyển mục đích, thuế đất đai theo Luật Đất đai 2024 & Quyết định 18/2026/QĐ-UBND.")
                 else:
-                    ans, _ = process_question(text)
+                    ans, _ = process_question_pipeline(text)
                     send_telegram(chat_id, ans)
             threading.Thread(target=_reply, daemon=True).start()
     return jsonify({"ok": True}), 200
