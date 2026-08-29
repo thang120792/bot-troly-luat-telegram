@@ -55,10 +55,19 @@ sys.stdout.reconfigure(encoding='utf-8')
 
 app = Flask(__name__, static_folder='.')
 
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        res = jsonify({"status": "ok"})
+        res.headers['Access-Control-Allow-Origin'] = '*'
+        res.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization,x-goog-api-key,X-Requested-With'
+        res.headers['Access-Control-Allow-Methods'] = 'GET,PUT,POST,DELETE,OPTIONS'
+        return res, 200
+
 @app.after_request
 def add_cors_headers(response):
     response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization,x-goog-api-key'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization,x-goog-api-key,X-Requested-With'
     response.headers['Access-Control-Allow-Methods'] = 'GET,PUT,POST,DELETE,OPTIONS'
     return response
 
