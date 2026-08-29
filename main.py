@@ -2307,6 +2307,22 @@ def sanitize_legal_hallucinations(text, question=""):
         if re.search(r'(Chủ tịch\s*)?UBND\s*cấp\s*xã|UBND\s*huyện', text, flags=re.IGNORECASE) and "Sở" not in text:
             text += "\n\n> ⚠️ *Lưu đính chính: với GCN do UBND tỉnh ký cấp trước đây, hồ sơ thu hồi/đính chính/cấp lại do **Sở Nông nghiệp và Môi trường cấp tỉnh** thụ lý theo nguyên tắc đồng cấp (Điều 14 NĐ 49/2026/NĐ-CP).*"
 
+    # BẮT BUỘC 100% TIẾNG VIỆT: Tự động chuyển đổi các tiêu đề/từ tiếng Anh sang Tiếng Việt chuẩn
+    en_vi_rules = [
+        (r'\bStep\s*(\d+):?', r'Bước \1:'),
+        (r'\bNote:\b', 'Lưu ý:'),
+        (r'\bImportant:\b', 'Quan trọng:'),
+        (r'\bLegal Basis:\b', 'Căn cứ pháp lý:'),
+        (r'\bRequirements?:\b', 'Điều kiện áp dụng:'),
+        (r'\bProcedures?:\b', 'Trình tự thực hiện:'),
+        (r'\bDocuments?:\b', 'Thành phần hồ sơ:'),
+        (r'\bSummary:\b', 'Tóm tắt:'),
+        (r'\bIn conclusion\b', 'Tóm lại'),
+        (r'\bAccording to\b', 'Căn cứ theo'),
+    ]
+    for pattern, rep in en_vi_rules:
+        text = re.sub(pattern, rep, text, flags=re.IGNORECASE)
+
     return text
 
 # ══ ZERO-HALLUCINATION GUARD ĐÃ ĐƯỢC ĐIỀU CHỈNH: TRẢ LỜI LINH HOẠT THEO TỪ KHÓA & KỊCH BẢN ══
@@ -2396,10 +2412,17 @@ def build_no_data_guided_answer(question):
 
 def generate_response_with_gemini_api(prompt):
     """
-    ƯU TIÊN 1: Phân tích bằng Gemini 3.6 Flash qua Google GenAI SDK hoặc REST API.
+    ƯU TIÊN 1: Phân tích bằng Gemini Flash API (BẮT BUỘC 100% TIẾNG VIỆT).
     Tự động chuyển đổi giữa các API Key dự phòng khi gặp lỗi Quota/Rate Limit (429/403).
     Khi tất cả các Key đều hết token -> Tự động trả về None để chuyển sang Ollama Local.
     """
+    strict_vi_instruction = (
+        "[QUY ĐỊNH BẮT BUỘC VỀ NGÔN NGỮ: 100% TIẾNG VIỆT]\n"
+        "Toàn bộ câu trả lời BẮT BUỘC phải viết 100% bằng Tiếng Việt chuẩn mực, đúng ngữ pháp và thuật ngữ pháp lý Việt Nam. "
+        "Tuyệt đối KHÔNG sử dụng tiếng Anh hoặc bất kỳ ngoại ngữ nào khác.\n\n"
+    )
+    full_prompt = strict_vi_instruction + prompt
+
     for idx, api_key in enumerate(GEMINI_API_KEYS):
         key_label = f"Key #{idx+1}"
         # 1. Thử qua Google GenAI SDK nếu sẵn sàng
@@ -2407,9 +2430,9 @@ def generate_response_with_gemini_api(prompt):
             try:
                 from google import genai
                 client = genai.Client(api_key=api_key)
-                for model_name in ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-2.5-flash"]:
+                for model_name in ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-flash-latest", "gemini-2.5-flash"]:
                     try:
-                        res = client.models.generate_content(model=model_name, contents=prompt)
+                        res = client.models.generate_content(model=model_name, contents=full_prompt)
                         if res and res.text and len(res.text.strip()) > 10:
                             print(f"✅ Gemini SDK {key_label} ({model_name}) phản hồi thành công!")
                             return res.text.strip(), f"Gemini Cloud ({key_label} - {model_name})"
@@ -2420,9 +2443,9 @@ def generate_response_with_gemini_api(prompt):
                 print(f"⚠️ Google GenAI SDK init error for {key_label}: {e_sdk}")
 
         # 2. Thử qua REST API (cho từng Key)
-        for model_name in ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-2.5-flash"]:
+        for model_name in ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-flash-latest", "gemini-2.5-flash"]:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
-            payload = {"contents": [{"parts": [{"text": prompt}]}]}
+            payload = {"contents": [{"parts": [{"text": full_prompt}]}]}
             data = json.dumps(payload).encode('utf-8')
             req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json', 'x-goog-api-key': api_key})
             try:
