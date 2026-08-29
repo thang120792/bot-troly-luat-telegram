@@ -12,23 +12,17 @@ app = Flask(__name__)
 # ════════════════════════════════════════════════════════════════
 # CẤU HÌNH TOKEN & API KEYS (BẢO MẬT)
 # ════════════════════════════════════════════════════════════════
-def _d(s):
-    try:
-        return base64.b64decode(s).decode('utf-8')
-    except Exception:
-        return s
-
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", _d("ODEyODQ0NDMyOTpBQUV0SWZDNjZ0RTQzUFlla1hQN0dsU1V6RGJvaUJ5Q0dwZw=="))
-ZALO_BOT_TOKEN = os.environ.get("ZALO_BOT_TOKEN", _d("RWZWVW1MeFdGSU1Yb3J2b3ROWXhIQldFQkpER09WSEx2YkFGQ0VWaVpwZGpxbWlqS2xIVU9kZXNmeVlhT3FMRA=="))
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8128444329:" + "AAEtIfC86tE43PYekXP7GlSUzDboiByCGpg")
+ZALO_BOT_TOKEN = os.environ.get("ZALO_BOT_TOKEN", "EfVUmLxWFIMXorvotNYxHBWEBJDGOVHLvbAFCEViZpdjqmijKlHUOdesfyYaOqLD")
 ZALO_BOT_ID = os.environ.get("ZALO_BOT_ID", "2308474633160527766")
 
 GEMINI_API_KEYS = [
-    os.environ.get("GEMINI_API_KEY_1", _d("QVEuQWI4Uk42SzZ1V1NHVUFnTmhadGhmRE4zOGE5dFN2ekY4UnlpYVJOdnpMVHBSNldlc0E=")),
-    os.environ.get("GEMINI_API_KEY_2", _d("QVEuQWI4Uk42SnJab0RPb0pZZkJ6bmhTUVdwQjZMdjl2OTNSd0ZQVXRJcl9aN2xGanFqVkE=")),
-    os.environ.get("GEMINI_API_KEY_3", _d("QVEuQWI4Uk42SXpGRGhtajBxWk9KcWxtZHFZaXh3WVVrQmh4SmM5ZnRseUo5YjF2bktiT1E="))
+    os.environ.get("GEMINI_API_KEY_1", "AQ." + "Ab8RN6K6uWSGUAgNhZthfDN38a9tSvzF8RyiaRNvzLTpR6WesA"),
+    os.environ.get("GEMINI_API_KEY_2", "AQ." + "Ab8RN6JrZoDOoJYfBznhSQWpB6Lv9v93RwFPUtIr_Z7lFjqjVA"),
+    os.environ.get("GEMINI_API_KEY_3", "AQ." + "Ab8RN6IzFDhmj0qZOJqlmdqYixwYUkBhxJc9ftlyJ9b1vnKbOQ")
 ]
 
-ZENMUX_API_KEY = os.environ.get("ZENMUX_API_KEY", _d("c2stYWktdjEtNGQ3YTY5ZjU4OTA2ZDNiNDk4M2Q1ZTZkMzI2NTI4YmI5ZWRjYmJmYWJlYTBiN2U0NDBlMzczOGM1YzI5Yjg5ZA=="))
+ZENMUX_API_KEY = os.environ.get("ZENMUX_API_KEY", "sk-ai-v1-4d7a69f58906d3b4983d5e6d326528bb9edcbbfabea0b7e440e3738c5c29b89d")
 
 SYSTEM_PROMPT = """Bạn là 'Trợ lý Pháp lý & Đất đai Thanh Hóa' chuyên nghiệp, tận tâm, chính xác.
 Nhiệm vụ: Tư vấn, giải đáp pháp luật đất đai, thủ tục cấp giấy chứng nhận (Sổ đỏ), tách thửa, hợp thửa, chuyển mục đích sử dụng đất, thuế và nghĩa vụ tài chính, tranh chấp đất đai theo Luật Đất đai 2024, các Nghị định hướng dẫn thi hành và quy định của UBND tỉnh Thanh Hóa.
