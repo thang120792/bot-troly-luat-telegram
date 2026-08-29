@@ -44,7 +44,7 @@ def _decode_k(b64_s):
         return ""
 
 _K_LIST = [
-    "QVEuQWI4Uk42S1l3bjk1MElrclVkeER2UVlmaTQ0UXVVUXBfRlQtNmtHY2Z3TWVrcEd5SkE=", # Key mới
+    "QVEuQWI4Uk42S1l3bjk1MElrclVkeER2UVlmaTQ0UXVVUXBfRlQtNmtHY2Z3TWVrcEd5SkE=",
     "QVEuQWI4Uk42SzZ1V1NHVUFnTmhadGhmRE4zOGE5dFN2ekY4UnlpYVJOdnpMVHBSNldlc0E=",
     "QVEuQWI4Uk42SnJab0RPb0pZZkJ6bmhTUVdwQjZMdjl2OTNSd0ZQVXRJcl9aN2xGanFqVkE=",
     "QVEuQWI4Uk42SXpGRGhtajBxak9KbG1kcVlpeHdZVWtCaHhKYzlmdGx5SjliMXZuS2JPUQ==",
@@ -55,7 +55,7 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8128444329:AAEtIfC86t
 ZALO_BOT_TOKEN = os.environ.get("ZALO_BOT_TOKEN", "EfVUmLxWFIMXorvotNYxHBWEBJDGOVHLvbAFCEViZpdjqmijKlHUOdesfyYaOqLD")
 
 # ══════════════════════════════════════════════════════════════════
-# SYSTEM PROMPT CHUẨN CỦA TRỢ LÝ PHÁP LÝ & ĐẤT ĐAI THANH HÓA
+# SYSTEM PROMPT PHÁP LÝ ĐẤT ĐAI
 # ══════════════════════════════════════════════════════════════════
 SYSTEM_PROMPT = """Bạn là 'Trợ lý Pháp lý & Đất đai Thanh Hóa' chuyên nghiệp, tận tâm, chính xác.
 
@@ -100,8 +100,8 @@ Quy tắc:
 PROMPT_LAND_EXACT = """Bạn là chuyên gia OCR tài liệu đất đai Việt Nam.
 Hãy đọc toàn bộ thông tin trên ảnh Giấy chứng nhận quyền sử dụng đất (Sổ đỏ/Sổ hồng) và trả về ĐÚNG CHUẨN JSON như sau:
 {
-  "certificate_serial_number": "Số phát hành GCN ở dưới cùng bìa (VD: DA 895241, CM 902946)",
-  "registration_book_number": "Số vào sổ cấp GCN (VD: CH 00071, CS 1234)",
+  "certificate_serial_number": "Số phát hành GCN ở dưới cùng bìa có 2 chữ cái in hoa ở đầu (VD: DA 895241, CM 902946, BX 123456)",
+  "registration_book_number": "Số vào sổ cấp GCN (VD: CH 00071, CS 1234, CN 5678)",
   "owner_name": "Tên người sử dụng đất / chủ sở hữu",
   "parcel_number": "Thửa đất số (chỉ con số)",
   "map_sheet_number": "Tờ bản đồ số (chỉ con số)",
@@ -110,14 +110,14 @@ Hãy đọc toàn bộ thông tin trên ảnh Giấy chứng nhận quyền sử
   "purpose_of_use": "Mục đích sử dụng (VD: Đất ở tại nông thôn (ONT))",
   "time_of_use": "Thời hạn sử dụng (VD: Lâu dài)",
   "date_of_issue": "Ngày cấp GCN (DD/MM/YYYY)",
-  "place_of_issue": "Nơi cấp / Cơ quan cấp"
+  "place_of_issue": "Nơi cấp / Cơ quan cấp (VD: UBND Huyện Bá Thước, Sở TN&MT)"
 }
 Quy tắc:
 - Chỉ trả về JSON thuần túy, không có giải thích hay markdown code block.
 - Nếu trường nào không thấy, để giá trị ""."""
 
 # ══════════════════════════════════════════════════════════════════
-# AI ENGINE - GEMINI CHỦ ĐẠO & DỰ PHÒNG ZENMUX
+# AI ENGINE - GEMINI CHỦ ĐẠO & DỰ PHÒNG ZENMUX (TEXT CHAT)
 # ══════════════════════════════════════════════════════════════════
 def call_gemini_primary(question):
     gemini_models = [
@@ -226,40 +226,42 @@ def process_question_pipeline(question):
     ), "Trợ lý Pháp lý Thanh Hóa"
 
 # ══════════════════════════════════════════════════════════════════
-# GEMINI VISION OCR ENGINE CHO PHÂN HỆ 2
+# GEMINI & ZENMUX VISION OCR ENGINE CHO PHÂN HỆ 2
 # ══════════════════════════════════════════════════════════════════
-def extract_ocr_with_gemini_vision(image_base64, mime_type, doc_type="cccd"):
+def extract_ocr_with_vision(image_base64, mime_type, doc_type="cccd"):
     prompt = PROMPT_CCCD_EXACT if doc_type == "cccd" else PROMPT_LAND_EXACT
-    gemini_models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+    gemini_models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.0-flash-lite", "gemini-1.5-pro"]
     
-    payload = {
-        "contents": [{
-            "parts": [
-                {"text": prompt},
-                {
-                    "inlineData": {
-                        "mimeType": mime_type,
-                        "data": image_base64
-                    }
-                }
-            ]
-        }],
-        "generationConfig": {
-            "temperature": 0.1,
-            "maxOutputTokens": 2048
-        }
-    }
-    payload_data = json.dumps(payload).encode("utf-8")
-
+    # 1. Thử qua Google Gemini Vision
     for key in GEMINI_API_KEYS:
         if not key or len(key) < 10:
             continue
+            
+        payload = {
+            "contents": [{
+                "parts": [
+                    {
+                        "inline_data": {
+                            "mime_type": mime_type,
+                            "data": image_base64
+                        }
+                    },
+                    {"text": prompt}
+                ]
+            }],
+            "generationConfig": {
+                "temperature": 0.1,
+                "maxOutputTokens": 2048
+            }
+        }
+        payload_data = json.dumps(payload).encode("utf-8")
+
         for model in gemini_models:
-            # Protocol 1: x-goog-api-key
+            # Format A: ?key= + x-goog-api-key
             try:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
                 req = urllib.request.Request(url, data=payload_data, headers={"Content-Type": "application/json", "x-goog-api-key": key}, method="POST")
-                with urllib.request.urlopen(req, timeout=35) as resp:
+                with urllib.request.urlopen(req, timeout=30) as resp:
                     res_json = json.loads(resp.read().decode("utf-8"))
                     candidates = res_json.get("candidates", [])
                     if candidates:
@@ -267,15 +269,16 @@ def extract_ocr_with_gemini_vision(image_base64, mime_type, doc_type="cccd"):
                         json_m = re.search(r'\{.*\}', raw_text, re.DOTALL)
                         if json_m:
                             extracted = json.loads(json_m.group(0))
-                            return extracted, f"Gemini Vision ({model})"
+                            if extracted and any(v for v in extracted.values() if v):
+                                return extracted, f"Gemini Vision ({model})"
             except Exception as e:
                 pass
 
-            # Protocol 2: Bearer Authorization
+            # Format B: Authorization Bearer
             try:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
                 req = urllib.request.Request(url, data=payload_data, headers={"Content-Type": "application/json", "Authorization": f"Bearer {key}"}, method="POST")
-                with urllib.request.urlopen(req, timeout=35) as resp:
+                with urllib.request.urlopen(req, timeout=30) as resp:
                     res_json = json.loads(resp.read().decode("utf-8"))
                     candidates = res_json.get("candidates", [])
                     if candidates:
@@ -283,7 +286,44 @@ def extract_ocr_with_gemini_vision(image_base64, mime_type, doc_type="cccd"):
                         json_m = re.search(r'\{.*\}', raw_text, re.DOTALL)
                         if json_m:
                             extracted = json.loads(json_m.group(0))
-                            return extracted, f"Gemini Vision ({model})"
+                            if extracted and any(v for v in extracted.values() if v):
+                                return extracted, f"Gemini Vision ({model})"
+            except Exception as e:
+                pass
+
+    # 2. Dự phòng qua ZenMux Multi-Modal Vision
+    if ZENMUX_API_KEY:
+        zenmux_vision_models = ["z-ai/glm-5.3-free", "dots-studio/dots3-note-prev", "deepseek/deepseek-chat"]
+        for zm in zenmux_vision_models:
+            try:
+                url = "https://zenmux.ai/api/v1/chat/completions"
+                payload = {
+                    "model": zm,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": prompt},
+                                {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{image_base64}"}}
+                            ]
+                        }
+                    ],
+                    "temperature": 0.1
+                }
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={"Authorization": f"Bearer {ZENMUX_API_KEY}", "Content-Type": "application/json"},
+                    method="POST"
+                )
+                with urllib.request.urlopen(req, timeout=35) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    ans = data["choices"][0]["message"]["content"].strip()
+                    json_m = re.search(r'\{.*\}', ans, re.DOTALL)
+                    if json_m:
+                        extracted = json.loads(json_m.group(0))
+                        if extracted and any(v for v in extracted.values() if v):
+                            return extracted, f"ZenMux Vision ({zm})"
             except Exception as e:
                 pass
 
@@ -361,10 +401,10 @@ def api_ocr():
     b64_image = base64.b64encode(content).decode("utf-8")
     data_url = f"data:{mime_type};base64,{b64_image}"
 
-    print(f"📷 [OCR Scan] Nhận ảnh {doc_type} ({len(content)} bytes), đang bóc tách qua Gemini Vision...")
-    extracted_raw, ocr_model = extract_ocr_with_gemini_vision(b64_image, mime_type, doc_type=doc_type)
+    print(f"📷 [OCR Scan] Nhận ảnh {doc_type} ({len(content)} bytes), đang bóc tách qua Vision...")
+    extracted_raw, ocr_model = extract_ocr_with_vision(b64_image, mime_type, doc_type=doc_type)
 
-    # Chuẩn hóa và làm phẳng các trường dữ liệu để khớp 100% với form web
+    # Chuẩn hóa và làm phẳng các trường dữ liệu
     extracted_data = {}
     if isinstance(extracted_raw, dict):
         for k, v in extracted_raw.items():
@@ -374,7 +414,7 @@ def api_ocr():
             else:
                 extracted_data[k] = v
 
-    # Tạo thêm các alias phổ biến để form frontend bắt chính xác
+    # Tạo đầy đủ các alias để frontend điền form 100%
     if doc_type == "cccd":
         if "id_number" in extracted_data:
             extracted_data["so_cccd"] = extracted_data["id_number"]
@@ -382,6 +422,7 @@ def api_ocr():
         if "full_name" in extracted_data:
             extracted_data["ho_va_ten"] = extracted_data["full_name"]
             extracted_data["cccd_hoten"] = extracted_data["full_name"]
+            extracted_data["ten"] = extracted_data["full_name"]
         if "date_of_birth" in extracted_data:
             extracted_data["ngay_sinh"] = extracted_data["date_of_birth"]
             extracted_data["cccd_ngaysinh"] = extracted_data["date_of_birth"]
@@ -397,32 +438,45 @@ def api_ocr():
         if "place_of_residence" in extracted_data:
             extracted_data["noi_thuong_tru"] = extracted_data["place_of_residence"]
             extracted_data["cccd_thuongtru"] = extracted_data["place_of_residence"]
+            extracted_data["dia_chi"] = extracted_data["place_of_residence"]
     else:
         # GCN Sổ đỏ
         if "certificate_serial_number" in extracted_data:
             extracted_data["land_sophathanh"] = extracted_data["certificate_serial_number"]
+            extracted_data["so_phat_hanh"] = extracted_data["certificate_serial_number"]
         if "registration_book_number" in extracted_data:
             extracted_data["land_sovaoso"] = extracted_data["registration_book_number"]
+            extracted_data["so_vao_so"] = extracted_data["registration_book_number"]
         if "date_of_issue" in extracted_data:
             extracted_data["land_ngaycap"] = extracted_data["date_of_issue"]
+            extracted_data["ngay_cap"] = extracted_data["date_of_issue"]
         if "place_of_issue" in extracted_data:
             extracted_data["land_noicap"] = extracted_data["place_of_issue"]
+            extracted_data["noi_cap"] = extracted_data["place_of_issue"]
         if "parcel_number" in extracted_data:
-            extracted_data["land_thua"] = extracted_data["parcel_number"]
+            extracted_data["land_thua"] = str(extracted_data["parcel_number"])
+            extracted_data["thua_dat_so"] = str(extracted_data["parcel_number"])
         if "map_sheet_number" in extracted_data:
-            extracted_data["land_tobando"] = extracted_data["map_sheet_number"]
+            extracted_data["land_tobando"] = str(extracted_data["map_sheet_number"])
+            extracted_data["to_ban_do_so"] = str(extracted_data["map_sheet_number"])
         if "parcel_address" in extracted_data:
             extracted_data["land_diachi"] = extracted_data["parcel_address"]
+            extracted_data["dia_chi_thua_dat"] = extracted_data["parcel_address"]
         if "area_number" in extracted_data:
-            extracted_data["land_dientich"] = extracted_data["area_number"]
+            extracted_data["land_dientich"] = str(extracted_data["area_number"])
+            extracted_data["dien_tich"] = str(extracted_data["area_number"])
         if "purpose_of_use" in extracted_data:
             extracted_data["land_mucdich"] = extracted_data["purpose_of_use"]
+            extracted_data["muc_dich_su_dung_dat"] = extracted_data["purpose_of_use"]
         if "time_of_use" in extracted_data:
             extracted_data["land_thoihan"] = extracted_data["time_of_use"]
+            extracted_data["thoi_han_su_dung"] = extracted_data["time_of_use"]
         if "owner_name" in extracted_data:
             extracted_data["chu_su_dung"] = extracted_data["owner_name"]
+            extracted_data["land_chu"] = extracted_data["owner_name"]
+            extracted_data["ten_chu_su_dung"] = extracted_data["owner_name"]
 
-    print(f"✅ [OCR Kết Quả] {doc_type}: {len(extracted_data)} trường dữ liệu được trích xuất thành công!")
+    print(f"✅ [OCR Thành Công] {doc_type}: {len(extracted_data)} trường dữ liệu được trích xuất ({ocr_model})")
 
     return jsonify({
         "success": True if extracted_data else False,
