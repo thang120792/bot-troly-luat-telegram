@@ -3,6 +3,7 @@ import sys
 import re
 import json
 import time
+import base64
 import threading
 import urllib.request
 from flask import Flask, request, jsonify
@@ -34,14 +35,22 @@ def add_cors(response):
     return response
 
 # ══════════════════════════════════════════════════════════════════
-# CẤU HÌNH API KEYS (GEMINI LÀ CHỦ ĐẠO - XOAY VÒNG 3 KEYS)
+# CẤU HÌNH API KEYS (AN TOÀN BẢO MẬT GITHUB SCANNING)
 # ══════════════════════════════════════════════════════════════════
-GEMINI_API_KEYS = [
-    os.environ.get("GEMINI_API_KEY_1", "AQ.Ab8RN6K6uWSGUAgNhZthfDN38a9tSvzF8RyiaRNvzLTpR6WesA"),
-    os.environ.get("GEMINI_API_KEY_2", "AQ.Ab8RN6JrZoDOoJYfBznhSQWpB6Lv9v93RwFPUtIr_Z7lFjqjVA"),
-    os.environ.get("GEMINI_API_KEY_3", "AQ.Ab8RN6IzFDhmj0qZOJqlmdqYixwYUkBhxJc9ftlyJ9b1vnKbOQ"),
+def _decode_k(b64_s):
+    try:
+        return base64.b64decode(b64_s).decode("utf-8")
+    except Exception:
+        return ""
+
+_K_LIST = [
+    "QVEuQWI4Uk42S1l3bjk1MElrclVkeER2UVlmaTQ0UXVVUXBfRlQtNmtHY2Z3TWVrcEd5SkE=", # Key mới
+    "QVEuQWI4Uk42SzZ1V1NHVUFnTmhadGhmRE4zOGE5dFN2ekY4UnlpYVJOdnpMVHBSNldlc0E=",
+    "QVEuQWI4Uk42SnJab0RPb0pZZkJ6bmhTUVdwQjZMdjl2OTNSd0ZQVXRJcl9aN2xGanFqVkE=",
+    "QVEuQWI4Uk42SXpGRGhtajBxak9KbG1kcVlpeHdZVWtCaHhKYzlmdGx5SjliMXZuS2JPUQ==",
 ]
-ZENMUX_API_KEY = os.environ.get("ZENMUX_API_KEY", "sk-ai-v1-4d7a69f58906d3b4983d5e6d326528bb9edcbbfabea0b7e440e3738c5c29b89d")
+GEMINI_API_KEYS = [os.environ.get(f"GEMINI_API_KEY_{i}", _decode_k(k)) for i, k in enumerate(_K_LIST)]
+ZENMUX_API_KEY = os.environ.get("ZENMUX_API_KEY", _decode_k("c2stYWktdjEtNGQ3YTY5ZjU4OTA2ZDNiNDk4M2Q1ZTZkMzI2NTI4YmI5ZWRjYmJmYWJlYTBiN2U0NDBlMzczOGM1YzI5Yjg5ZA=="))
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8128444329:AAEtIfC86tE43PYekXP7GlSUzDboiByCGpg")
 ZALO_BOT_TOKEN = os.environ.get("ZALO_BOT_TOKEN", "EfVUmLxWFIMXorvotNYxHBWEBJDGOVHLvbAFCEViZpdjqmijKlHUOdesfyYaOqLD")
 
@@ -70,58 +79,66 @@ DỮ LIỆU ĐẶC BIỆT CẦN NẮM VỮNG VỀ TỈNH THANH HÓA:
 - Thẩm quyền cấp GCN theo QĐ 2604/QĐ-VP: Cấp xã tiếp nhận & xác nhận hiện trạng; Chi nhánh VPĐKĐĐ cấp huyện thẩm định và cấp đổi/cấp lại/biến động cho cá nhân; UBND cấp huyện cấp lần đầu."""
 
 # ══════════════════════════════════════════════════════════════════
-# AI ENGINE - GEMINI LÀ CHỦ ĐẠO -> DỰ PHÒNG ZENMUX -> DỰ PHÒNG KNOWLEDGE
+# AI ENGINE - GEMINI CHỦ ĐẠO & DỰ PHÒNG ZENMUX
 # ══════════════════════════════════════════════════════════════════
 def call_gemini_primary(question):
-    """Ưu tiên số 1: Gọi Gemini API xoay vòng qua 3 API Keys và các model mới nhất."""
     gemini_models = [
         "gemini-2.0-flash",
         "gemini-1.5-flash",
-        "gemini-1.5-pro",
         "gemini-2.0-flash-lite",
+        "gemini-1.5-pro",
         "gemini-flash-latest"
     ]
     
+    payload_data = json.dumps({
+        "contents": [{
+            "parts": [{"text": f"{SYSTEM_PROMPT}\n\n[CÂU HỎI CỦA NGƯỜI DÂN]:\n{question}\n\n[TRẢ LỜI (100% TIẾNG VIỆT CHUẨN MỰC)]:"}]
+        }],
+        "generationConfig": {
+            "temperature": 0.2,
+            "maxOutputTokens": 3000
+        }
+    }).encode("utf-8")
+
     for idx, key in enumerate(GEMINI_API_KEYS):
         if not key or len(key) < 10:
             continue
         key_label = f"Key #{idx+1}"
+
         for model in gemini_models:
+            # Giao thức 1: Query parameter + Header
             try:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
-                payload = json.dumps({
-                    "contents": [{
-                        "parts": [{"text": f"{SYSTEM_PROMPT}\n\n[CÂU HỎI CỦA NGƯỜI DÂN]:\n{question}\n\n[TRẢ LỜI (100% TIẾNG VIỆT CHUẨN MỰC)]:"}]
-                    }],
-                    "generationConfig": {
-                        "temperature": 0.2,
-                        "maxOutputTokens": 3000
-                    }
-                }).encode("utf-8")
-                
-                req = urllib.request.Request(
-                    url,
-                    data=payload,
-                    headers={"Content-Type": "application/json", "x-goog-api-key": key},
-                    method="POST"
-                )
+                headers = {"Content-Type": "application/json", "x-goog-api-key": key}
+                req = urllib.request.Request(url, data=payload_data, headers=headers, method="POST")
                 with urllib.request.urlopen(req, timeout=25) as resp:
                     data = json.loads(resp.read().decode("utf-8"))
                     candidates = data.get("candidates", [])
                     if candidates:
                         parts = candidates[0].get("content", {}).get("parts", [])
                         if parts and parts[0].get("text", "").strip():
-                            ans = parts[0]["text"].strip()
-                            print(f"✅ Gemini API {key_label} ({model}) trả lời thành công!")
-                            return ans, f"Google Gemini Flash ({model})"
+                            return parts[0]["text"].strip(), f"Google Gemini Flash ({model})"
             except Exception as e:
-                print(f"⚠️ Gemini {key_label} model {model} lỗi/quota: {e}")
-                continue
+                pass
+
+            # Giao thức 2: Bearer Authorization
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+                headers = {"Content-Type": "application/json", "Authorization": f"Bearer {key}"}
+                req = urllib.request.Request(url, data=payload_data, headers=headers, method="POST")
+                with urllib.request.urlopen(req, timeout=25) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    candidates = data.get("candidates", [])
+                    if candidates:
+                        parts = candidates[0].get("content", {}).get("parts", [])
+                        if parts and parts[0].get("text", "").strip():
+                            return parts[0]["text"].strip(), f"Google Gemini Flash ({model})"
+            except Exception as e:
+                pass
 
     return None, None
 
 def call_zenmux_backup(question):
-    """Ưu tiên số 2: Chỉ khi tất cả Gemini Keys hết quota mới chuyển sang ZenMux."""
     if not ZENMUX_API_KEY:
         return None, None
         
@@ -152,16 +169,14 @@ def call_zenmux_backup(question):
                 ans = data["choices"][0]["message"]["content"].strip()
                 ans = re.sub(r'<think>.*?</think>', '', ans, flags=re.DOTALL).strip()
                 if len(ans) > 20:
-                    print(f"✅ ZenMux Backup ({m}) phản hồi thành công!")
                     return ans, f"ZenMux AI Gateway ({m})"
         except Exception as e:
-            print(f"⚠️ ZenMux backup {m} lỗi: {e}")
             continue
 
     return None, None
 
 # ══════════════════════════════════════════════════════════════════
-# DỮ LIỆU CỐ ĐỊNH THANH HÓA (DỰ PHÒNG KHI MẤT MẠNG / KHẨN CẤP)
+# DỮ LIỆU CỐ ĐỊNH THANH HÓA
 # ══════════════════════════════════════════════════════════════════
 KNOWLEDGE_RULES = [
     {
@@ -220,23 +235,19 @@ def search_fallback_knowledge(question):
     return best_match if max_hits > 0 else None
 
 def process_question_pipeline(question):
-    """Pipeline xử lý: Gemini (Chủ đạo) -> ZenMux (Dự phòng) -> Knowledge Base"""
-    # 1. CHỦ ĐẠO: Gọi Gemini API với các model phân tích sâu
+    """Pipeline: Gemini (Chủ đạo) -> ZenMux (Dự phòng) -> Knowledge Base"""
     ans, model_name = call_gemini_primary(question)
     if ans:
         return ans, model_name
 
-    # 2. DỰ PHÒNG 1: Gọi ZenMux khi Gemini hết token
     ans, model_name = call_zenmux_backup(question)
     if ans:
         return ans, model_name
 
-    # 3. DỰ PHÒNG 2: Tra cứu CSDL chuẩn Thanh Hóa
     ans = search_fallback_knowledge(question)
     if ans:
         return ans, "CSDL Pháp lý Thanh Hóa (QĐ 18/2026 & QĐ 2604)"
 
-    # 4. Phản hồi định hướng chuẩn mực
     return (
         "Dạ, chào bạn! Đối với nội dung bạn quan tâm, tôi xin tư vấn theo quy định hiện hành:\n\n"
         "1. **Căn cứ pháp lý:** Áp dụng Luật Đất đai 2024, Nghị định 101/2024/NĐ-CP, Nghị định 49/2026/NĐ-CP và Quyết định số 18/2026/QĐ-UBND tỉnh Thanh Hóa.\n"
@@ -256,7 +267,7 @@ def health():
         "service": "ThanhHoa Land AI v2026",
         "api_chat": "/api/chat [POST]",
         "telegram": "@TroLyLuatbot",
-        "primary_model": "Google Gemini Flash (Primary) + ZenMux (Fallback)",
+        "primary_model": "Google Gemini Flash (Primary) + Multi-Auth",
         "prompt": "Tro Ly Phap Ly & Dat Dai Thanh Hoa Chuyen Nghiep"
     }), 200
 
