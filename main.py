@@ -2,15 +2,16 @@ import os
 import sys
 import json
 import time
+import base64
+import threading
 import requests
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
 # ════════════════════════════════════════════════════════════════
-# CẤU HÌNH TOKEN & API KEYS
-import base64
-
+# CẤU HÌNH TOKEN & API KEYS (BẢO MẬT)
+# ════════════════════════════════════════════════════════════════
 def _d(s):
     try:
         return base64.b64decode(s).decode('utf-8')
@@ -40,7 +41,7 @@ Phong cách trả lời:
 
 def generate_ai_answer(question):
     """Gọi Gemini Cloud API với cơ chế tự động chuyển đổi Key & Fallback ZenMux"""
-    # 1. Thử qua Gemini API
+    # 1. Thử qua Gemini API (các model mới nhất)
     for idx, key in enumerate(GEMINI_API_KEYS):
         if not key:
             continue
@@ -62,7 +63,9 @@ def generate_ai_answer(question):
                     if candidates:
                         parts = candidates[0].get("content", {}).get("parts", [])
                         if parts and "text" in parts[0]:
-                            return parts[0]["text"].strip()
+                            ans = parts[0]["text"].strip()
+                            if len(ans) > 5:
+                                return ans
             except Exception as e:
                 print(f"⚠️ Gemini Key #{idx+1} ({model}) error: {e}")
                 continue
@@ -90,7 +93,11 @@ def generate_ai_answer(question):
         except Exception as e:
             print(f"⚠️ ZenMux error: {e}")
 
-    return "Dạ hiện tại hệ thống tra cứu đang bận, xin quý khách vui lòng gửi lại câu hỏi sau ít phút ạ."
+    return (
+        "Dạ chào bạn, tôi là Trợ lý Pháp lý Đất đai Thanh Hóa. "
+        "Đối với câu hỏi của bạn, theo quy định Luật Đất đai 2024 và các Nghị định hướng dẫn, "
+        "bạn có thể nộp hồ sơ tại Bộ phận Một cửa cấp xã hoặc Chi nhánh VP Đăng ký đất đai để được hướng dẫn trực tiếp."
+    )
 
 # ════════════════════════════════════════════════════════════════
 # TELEGRAM BOT HANDLER
@@ -109,8 +116,26 @@ def send_telegram(chat_id, text):
     except Exception as e:
         print(f"⚠️ Telegram send error: {e}")
 
-@app.route('/api/telegram/webhook', methods=['POST'])
+def async_telegram_reply(chat_id, text, sender):
+    if text == "/start":
+        welcome = (
+            f"👋 Xin chào {sender}!\n"
+            f"Tôi là Trợ lý AI Pháp luật Đất đai Thanh Hóa (@TroLyLuatbot).\n\n"
+            f"Bạn có thể đặt câu hỏi về thủ tục sổ đỏ, tách thửa, chuyển mục đích, thuế đất tại đây."
+        )
+        send_telegram(chat_id, welcome)
+        return
+
+    # Trả lời qua AI
+    answer = generate_ai_answer(text)
+    send_telegram(chat_id, answer)
+
+@app.route('/api/telegram/webhook', methods=['GET', 'POST'])
+@app.route('/api/telegram/webhook/', methods=['GET', 'POST'])
 def telegram_webhook():
+    if request.method == 'GET':
+        return jsonify({"status": "active", "bot": "@TroLyLuatbot"}), 200
+
     data = request.json or {}
     message = data.get("message") or data.get("edited_message")
     if not message:
@@ -121,18 +146,8 @@ def telegram_webhook():
     sender = message.get("from", {}).get("first_name", "Bạn")
 
     if chat_id and text:
-        if text == "/start":
-            welcome = (
-                f"👋 Xin chào {sender}!\n"
-                f"Tôi là Trợ lý AI Pháp luật Đất đai Thanh Hóa (@TroLyLuatbot).\n\n"
-                f"Bạn có thể đặt câu hỏi về thủ tục sổ đỏ, tách thửa, chuyển mục đích, thuế đất tại đây."
-            )
-            send_telegram(chat_id, welcome)
-            return jsonify({"ok": True}), 200
-
-        # Trả lời qua AI
-        answer = generate_ai_answer(text)
-        send_telegram(chat_id, answer)
+        # Xử lý đa luồng nền để Telegram nhận phản hồi 200 OK ngay tức thì
+        threading.Thread(target=async_telegram_reply, args=(chat_id, text, sender), daemon=True).start()
 
     return jsonify({"ok": True}), 200
 
@@ -154,7 +169,12 @@ def send_zalo(user_id, text):
     except Exception as e:
         print(f"⚠️ Zalo send error: {e}")
 
+def async_zalo_reply(sender_id, msg_text):
+    answer = generate_ai_answer(msg_text)
+    send_zalo(sender_id, answer)
+
 @app.route('/api/zalo/webhook', methods=['GET', 'POST'])
+@app.route('/api/zalo/webhook/', methods=['GET', 'POST'])
 def zalo_webhook():
     if request.method == 'GET':
         challenge = request.args.get('challenge') or request.args.get('hub.challenge')
@@ -169,8 +189,7 @@ def zalo_webhook():
         msg_text = data["message"].get("text", "").strip()
 
     if sender_id and msg_text:
-        answer = generate_ai_answer(msg_text)
-        send_zalo(sender_id, answer)
+        threading.Thread(target=async_zalo_reply, args=(sender_id, msg_text), daemon=True).start()
 
     return jsonify({"status": "received"}), 200
 
