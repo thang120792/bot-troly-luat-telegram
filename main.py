@@ -55,6 +55,13 @@ sys.stdout.reconfigure(encoding='utf-8')
 
 app = Flask(__name__, static_folder='.')
 
+@app.after_request
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization,x-goog-api-key'
+    response.headers['Access-Control-Allow-Methods'] = 'GET,PUT,POST,DELETE,OPTIONS'
+    return response
+
 # Try importing PyMuPDF (fitz) for PDF page rendering
 try:
     import fitz
