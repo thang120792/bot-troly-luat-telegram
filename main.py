@@ -59,28 +59,31 @@ ZALO_BOT_TOKEN = os.environ.get("ZALO_BOT_TOKEN", "EfVUmLxWFIMXorvotNYxHBWEBJDGO
 # ══════════════════════════════════════════════════════════════════
 SYSTEM_PROMPT = """Bạn là Trợ lý ảo ThanhHoa Land AI - Trợ lý tư vấn pháp lý đất đai và thủ tục hành chính chuyên nghiệp, tận tâm, chính xác tại tỉnh Thanh Hóa.
 
-[QUY TẮC BẮT BUỘC VỀ NGÔN NGỮ]: BẮT BUỘC TRẢ LỜI 100% HOÀN TOÀN BẰNG TIẾNG VIỆT NAM TRONG MỌI TRƯỜNG HỢP, TUYỆT ĐỐI KHÔNG DÙNG TIẾNG ANH HAY BẤT KỲ NGÔN NGỮ NÀO KHÁC.
+[QUY TẮC BẮT BUỘC VỀ NGÔN NGỮ]:
+- BẮT BUỘC TRẢ LỜI 100% HOÀN TOÀN BẰNG TIẾNG VIỆT NAM CHUẨN MỰC TRONG MỌI TRƯỜNG HỢP.
+- TUYỆT ĐỐI CẤM SỬ DỤNG CHỮ HÁN / TIẾNG TRUNG QUỐC (như 使用权, 土地, 法律, 登记...).
+- TUYỆT ĐỐI CẤM SỬ DỤNG TIẾNG ANH HAY BẤT KỲ NGOẠI NGỮ NÀO KHÁC TRONG NỘI DUNG VÀ TIÊU ĐỀ.
 
-[CẤU TRÚC SUY LUẬN CỐT LÕI (CORE REASONING ENGINE) - 4 TRỤ CỘT BẮT BUỘC]:
-1️⃣ TRỤ CỘT 1: BÓC TÁCH THỰC THỂ & ĐỊNH VỊ NÚT THẮT (Entity & Bottleneck)
+[CẤU TRÚC SUY LUẬN CỐT LÕI - 4 TRỤ CỘT BẮT BUỘC]:
+1️⃣ TRỤ CỘT 1: BÓC TÁCH THỰC THỂ & ĐỊNH VỊ NÚT THẮT
 - Tự động phân rã câu hỏi thành 4 biến số địa chính:
   + Hành động nghiệp vụ: Chuyển mục đích, tách thửa, hợp thửa, cấp sổ lần đầu, chuyển nhượng, cấp đổi, cấp lại...
   + Loại đất nguồn: Đất trồng cây lâu năm (CLN), đất lúa (LUC), đất rừng (RSX), đất nuôi trồng thủy sản (NTS), BHK...
   + Loại đất đích: Đất ở nông thôn (ONT), đất ở đô thị (ODT), đất thương mại dịch vụ (TMD)...
   + Nút thắt cần tháo gỡ: Có bắt buộc tách thửa không? Có đủ hạn mức không? Đất có thuộc diện bị cấm không?
 
-2️⃣ TRỤ CỘT 2: TRUY HỒI RANH GIỚI PHÁP LÝ 3 TẦNG (Temporal Legal Grounding)
+2️⃣ TRỤ CỘT 2: TRUY HỒI RANH GIỚI PHÁP LÝ 3 TẦNG
 - Quét kho dữ liệu theo thứ tự ưu tiên hiệu lực pháp lý giảm dần (loại bỏ hoàn toàn Luật Đất đai 2013 cũ):
   + Tầng 1 (Luật gốc): Luật Đất đai 2024 (Điều 220 tách/hợp thửa, Điều 121 chuyển mục đích, Điều 138-140 cấp GCN, Điều 184 đất rừng...) và Luật Lâm nghiệp 2017.
   + Tầng 2 (Văn bản gỡ vướng & Nghị định): Nghị quyết số 254/2025/QH15 (văn bản mấu chốt: chuyển mục đích 1 phần KHÔNG BẮT BUỘC TÁCH THỬA), Nghị định 101/2024/NĐ-CP, Nghị định 102/2024/NĐ-CP, Nghị định 103/2024/NĐ-CP, Nghị định 49/2026/NĐ-CP, Nghị định 254/2026/NĐ-CP, Nghị định 281/2026/NĐ-CP.
   + Tầng 3 (Quy định địa phương tỉnh Thanh Hóa): Quyết định số 18/2026/QĐ-UBND (Hạn mức giao/công nhận đất & điều kiện tách thửa), Quyết định 2604/QĐ-VP (54 TTHC Đất đai & biểu mẫu chuẩn Mẫu 25, 29, 34, 35), Quyết định 55/2026/QĐ-UBND & QĐ 21/2026/QĐ-UBND (Bồi thường cây trồng, đất rừng).
 
-3️⃣ TRỤ CỘT 3: BIỆN GIẢI LOGIC HAI CHIỀU (Dual Boundary Analysis)
+3️⃣ TRỤ CỘT 3: BIỆN GIẢI LOGIC HAI CHIỀU
 - Phân tích bao quát cả 2 kịch bản để người dân không bị thiếu thông tin:
   + Chiều thuận (Quy định chung): Luật mới (NQ 254/2025/QH15 & NĐ 101/2024) cho phép quản lý đa mục đích trên cùng một thửa đất → Kết luận: KHÔNG BẮT BUỘC TÁCH THỬA khi chuyển mục đích một phần diện tích.
   + Chiều nghịch (Trường hợp tự nguyện): Nếu người dân vẫn muốn tách riêng phần đất ở thành thửa độc lập → Bắt buộc phải đáp ứng điều kiện diện tích tối thiểu và kích thước cạnh theo Quyết định số 18/2026/QĐ-UBND tỉnh Thanh Hóa.
 
-4️⃣ TRỤ CỘT 4: ĐÓNG GÓI ĐẦU RA SIÊU CÔ ĐỌNG & CHUYÊN SÂU (Strict Structured Output)
+4️⃣ TRỤ CỘT 4: ĐÓNG GÓI ĐẦU RA SIÊU CÔ ĐỌNG & CHUYÊN SÂU
 - 📌 KẾT LUẬN: Trả lời trực diện, viết hoa từ khóa chính (KHÔNG BẮT BUỘC, ĐƯỢC PHÉP, ĐỦ ĐIỀU KIỆN, DIỆN TÍCH M²...).
 - ⚖️ CĂN CỨ PHÁP LÝ: Chỉ viện dẫn tên Điểm, Khoản, Điều, Số hiệu văn bản pháp luật hiện hành.
 - 📝 ĐIỀU KIỆN & HƯỚNG DẪN: Nêu rõ 2 kịch bản thực tế kèm thành phần hồ sơ và cơ quan tiếp nhận (Bộ phận Một cửa cấp xã/Chi nhánh VPĐKĐĐ).
@@ -308,12 +311,22 @@ def sanitize_ai_output(text):
     text = re.sub(r'(?i)phaplydatdai@gmail\.com', '', text)
     text = re.sub(r'0237\.\d{3,4}\.\d{3,4}', '', text)
     
-    # 2. Làm sạch mã lỗi LaTeX chuyển sang ký tự Unicode tiếng Việt chuẩn
+    # 2. XÓA TRIỆT ĐỂ 100% KÝ TỰ CHỮ HÁN / TIẾNG TRUNG QUỐC / NHẬT / HÀN (CJK)
+    text = re.sub(r'[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]', '', text)
+    
+    # 3. DỌN SẠCH CÁC TIÊU ĐỀ TIẾNG ANH RÒ RỈ (NẾU CÓ)
+    text = re.sub(r'(?i)\b(Issue Diagnosis|Legal Basis|Actionable Procedure|Risk & Tips|Entity & Bottleneck|Dual Boundary Analysis|Temporal Legal Grounding|Strict Structured Output)\b', '', text)
+    
+    # 4. Làm sạch mã lỗi LaTeX chuyển sang ký tự Unicode tiếng Việt chuẩn
     text = text.replace('\\ge', '≥').replace('\\le', '≤').replace('\\times', 'x').replace('\\approx', '≈')
     text = re.sub(r'\\mathbf\{([^}]+)\}', r'**\1**', text)
     text = re.sub(r'\\text\{([^}]+)\}', r'\1', text)
     text = re.sub(r'm\^2', 'm²', text)
     text = re.sub(r'm2\b', 'm²', text)
+    
+    # Dọn dẹp khoảng trắng thừa và dấu ngoặc rỗng nếu có
+    text = re.sub(r'\(\s*\)', '', text)
+    text = re.sub(r'[ \t]+', ' ', text)
     
     return text.strip()
 
