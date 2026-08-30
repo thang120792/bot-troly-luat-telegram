@@ -68,6 +68,9 @@ Phong cách và quy chuẩn trả lời:
 3. Hướng dẫn cụ thể cơ quan có thẩm quyền tiếp nhận hồ sơ (Bộ phận Một cửa cấp xã/phường hoặc Chi nhánh Văn phòng Đăng ký Đất đai nơi có đất).
 4. Liệt kê rõ các thành phần hồ sơ, giấy tờ người dân cần chuẩn bị.
 5. Giữ thái độ lịch sự, ân cần, chuẩn mực của cán bộ tư vấn pháp luật.
+6. TUYỆT ĐỐI KHÔNG BỊA ĐẶT THÔNG TIN LIÊN HỆ:
+   - TUYỆT ĐỐI KHÔNG tự nghĩ ra số điện thoại hotline, số bàn (0237.xxx), email giả (phaplydatdai@gmail.com).
+   - Chỉ hướng dẫn người dân liên hệ trực tiếp Bộ phận Một cửa UBND cấp xã hoặc Chi nhánh Văn phòng Đăng ký Đất đai nơi có đất.
 
 DỮ LIỆU ĐẶC BIỆT CẦN NẮM VỮNG VỀ TỈNH THANH HÓA:
 - Tách thửa đất ở theo QĐ 18/2026/QĐ-UBND:
@@ -117,9 +120,12 @@ Quy tắc:
 - Nếu trường nào không thấy, để giá trị ""."""
 
 # ══════════════════════════════════════════════════════════════════
-# AI ENGINE - GEMINI CHỦ ĐẠO & DỰ PHÒNG ZENMUX (TEXT CHAT)
+# AI ENGINE - GEMINI CHỦ ĐẠO & DỰ PHÒNG ZENMUX (MULTI-TURN CHAT CONTEXT)
 # ══════════════════════════════════════════════════════════════════
-def call_gemini_primary(question):
+def call_gemini_primary(question, history=None):
+    if history is None:
+        history = []
+        
     gemini_models = [
         "gemini-2.0-flash",
         "gemini-1.5-flash",
@@ -128,10 +134,38 @@ def call_gemini_primary(question):
         "gemini-flash-latest"
     ]
     
+    # Xây dựng chuỗi hội thoại đa lượt (Multi-turn Context)
+    contents = []
+    # Turn 0: System Prompt
+    contents.append({
+        "role": "user",
+        "parts": [{"text": f"{SYSTEM_PROMPT}\n\nXin chào bạn!"}]
+    })
+    contents.append({
+        "role": "model",
+        "parts": [{"text": "Dạ xin chào bạn! Tôi là Trợ lý Pháp lý & Đất đai Thanh Hóa. Tôi đã sẵn sàng tư vấn chi tiết cho bạn."}]
+    })
+    
+    # Các lượt trao đổi trước đó trong cùng cửa sổ
+    for item in history[-6:]:
+        r = item.get("role", "user")
+        c = item.get("content", "").strip()
+        if not c:
+            continue
+        gemini_role = "model" if r in ("assistant", "model", "bot") else "user"
+        contents.append({
+            "role": gemini_role,
+            "parts": [{"text": c}]
+        })
+        
+    # Câu hỏi hiện tại
+    contents.append({
+        "role": "user",
+        "parts": [{"text": f"[CÂU HỎI HIỆN TẠI]: {question}\n\n[TRẢ LỜI (100% TIẾNG VIỆT, LIỀN MẠCH NGỮ CẢNH HỘI THOẠI)]:"}]
+    })
+    
     payload_data = json.dumps({
-        "contents": [{
-            "parts": [{"text": f"{SYSTEM_PROMPT}\n\n[CÂU HỎI CỦA NGƯỜI DÂN]:\n{question}\n\n[TRẢ LỜI (100% TIẾNG VIỆT CHUẨN MỰC)]:"}]
-        }],
+        "contents": contents,
         "generationConfig": {
             "temperature": 0.2,
             "maxOutputTokens": 3000
@@ -172,24 +206,34 @@ def call_gemini_primary(question):
 
     return None, None
 
-def call_zenmux_backup(question):
+def call_zenmux_backup(question, history=None):
     if not ZENMUX_API_KEY:
         return None, None
+    if history is None:
+        history = []
         
     zenmux_models = [
         "deepseek/deepseek-chat",
         "z-ai/glm-5.3-free",
         "dots-studio/dots3-note-prev"
     ]
+    
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    for item in history[-6:]:
+        r = item.get("role", "user")
+        c = item.get("content", "").strip()
+        if not c:
+            continue
+        zm_role = "assistant" if r in ("assistant", "model", "bot") else "user"
+        messages.append({"role": zm_role, "content": c})
+    messages.append({"role": "user", "content": question})
+
     for m in zenmux_models:
         try:
             url = "https://zenmux.ai/api/v1/chat/completions"
             payload = json.dumps({
                 "model": m,
-                "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": question}
-                ],
+                "messages": messages,
                 "temperature": 0.2
             }).encode("utf-8")
             req = urllib.request.Request(
@@ -209,18 +253,30 @@ def call_zenmux_backup(question):
 
     return None, None
 
-def process_question_pipeline(question):
-    ans, model_name = call_gemini_primary(question)
-    if ans:
-        return ans, model_name
+def sanitize_ai_output(text):
+    if not text:
+        return text
+    # Xóa số điện thoại bịa đặt, hotline hoặc email giả do LLM tự sinh
+    text = re.sub(r'(?i)(?:số điện thoại|hotline|liên hệ trực tiếp|email|đường dây nóng)[\s:]*(?:0237[.\d\s]+|\w+@gmail\.com).*?(?:\n|$)', '', text)
+    text = re.sub(r'(?i)phaplydatdai@gmail\.com', '', text)
+    text = re.sub(r'0237\.\d{3,4}\.\d{3,4}', '', text)
+    return text.strip()
 
-    ans, model_name = call_zenmux_backup(question)
+def process_question_pipeline(question, history=None):
+    ans, model_name = call_gemini_primary(question, history=history)
     if ans:
-        return ans, model_name
+        return sanitize_ai_output(ans), model_name
+
+    ans, model_name = call_zenmux_backup(question, history=history)
+    if ans:
+        return sanitize_ai_output(ans), model_name
 
     return (
         "Dạ, chào bạn! Đối với nội dung bạn quan tâm, tôi xin tư vấn theo quy định hiện hành:\n\n"
         "1. **Căn cứ pháp lý:** Áp dụng Luật Đất đai 2024, Nghị định 101/2024/NĐ-CP, Nghị định 49/2026/NĐ-CP và Quyết định số 18/2026/QĐ-UBND tỉnh Thanh Hóa.\n"
+        "2. **Cơ quan tiếp nhận:** Bạn vui lòng liên hệ Bộ phận Một cửa UBND cấp xã/phường nơi có đất hoặc Chi nhánh Văn phòng Đăng ký đất đai cấp huyện để được tiếp nhận hồ sơ trích lục địa chính và thẩm định cụ thể.\n"
+        "3. **Hồ sơ cơ bản:** Đơn đăng ký biến động, bản gốc Giấy chứng nhận quyền sử dụng đất, bản sao CCCD và các giấy tờ chứng minh nguồn gốc đất."
+    ), "Trợ lý Pháp lý Thanh Hóa"
         "2. **Cơ quan tiếp nhận:** Bạn vui lòng liên hệ Bộ phận Một cửa UBND cấp xã/phường nơi có đất hoặc Chi nhánh Văn phòng Đăng ký đất đai cấp huyện để được tiếp nhận hồ sơ trích lục địa chính và thẩm định cụ thể.\n"
         "3. **Hồ sơ cơ bản:** Đơn đăng ký biến động, bản gốc Giấy chứng nhận quyền sử dụng đất, bản sao CCCD và các giấy tờ chứng minh nguồn gốc đất."
     ), "Trợ lý Pháp lý Thanh Hóa"
@@ -353,13 +409,14 @@ def api_chat():
 
     data = request.get_json(silent=True) or {}
     question = data.get("question", "").strip()
+    history = data.get("history", [])
     session_id = data.get("session_id", "web_user")
 
     if not question:
         return jsonify({"error": "Vui lòng nhập câu hỏi"}), 400
 
-    print(f"📥 [Web Chat] {session_id}: {question[:80]}")
-    answer, model_used = process_question_pipeline(question)
+    print(f"📥 [Web Chat] {session_id} (History: {len(history)} turns): {question[:80]}")
+    answer, model_used = process_question_pipeline(question, history=history)
 
     return jsonify({
         "answer": answer,
