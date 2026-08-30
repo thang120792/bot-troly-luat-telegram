@@ -50,6 +50,15 @@ _K_LIST = [
     "QVEuQWI4Uk42SXpGRGhtajBxak9KbG1kcVlpeHdZVWtCaHhKYzlmdGx5SjliMXZuS2JPUQ==",
 ]
 GEMINI_API_KEYS = [os.environ.get(f"GEMINI_API_KEY_{i}", _decode_k(k)) for i, k in enumerate(_K_LIST)]
+CHAT_GATEWAY_API_KEY = os.environ.get("CHAT_GATEWAY_API_KEY", "sk-2poy0rgg408uzhpv45psrpghbwun7hud")
+CHAT_GATEWAY_API_KEY = os.environ.get("CHAT_GATEWAY_API_KEY", "sk-2poy0rgg408uzhpv45psrpghbwun7hud")
+CHAT_GATEWAY_API_KEY = os.environ.get("CHAT_GATEWAY_API_KEY", "sk-2poy0rgg408uzhpv45psrpghbwun7hud")
+CHAT_GATEWAY_API_KEY = os.environ.get("CHAT_GATEWAY_API_KEY", "sk-2poy0rgg408uzhpv45psrpghbwun7hud")
+CHAT_GATEWAY_API_KEY = os.environ.get("CHAT_GATEWAY_API_KEY", "sk-2poy0rgg408uzhpv45psrpghbwun7hud")
+CHAT_GATEWAY_API_KEY = os.environ.get("CHAT_GATEWAY_API_KEY", "sk-2poy0rgg408uzhpv45psrpghbwun7hud")
+CHAT_GATEWAY_API_KEY = os.environ.get("CHAT_GATEWAY_API_KEY", "sk-2poy0rgg408uzhpv45psrpghbwun7hud")
+CHAT_GATEWAY_API_KEY = os.environ.get("CHAT_GATEWAY_API_KEY", "sk-2poy0rgg408uzhpv45psrpghbwun7hud")
+NEW_VISION_API_KEY = os.environ.get("NEW_VISION_API_KEY", "sk-2poy0rgg408uzhpv45psrpghbwun7hud")
 ZENMUX_API_KEY = os.environ.get("ZENMUX_API_KEY", _decode_k("c2stYWktdjEtNGQ3YTY5ZjU4OTA2ZDNiNDk4M2Q1ZTZkMzI2NTI4YmI5ZWRjYmJmYWJlYTBiN2U0NDBlMzczOGM1YzI5Yjg5ZA=="))
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8128444329:AAEtIfC86tE43PYekXP7GlSUzDboiByCGpg")
 ZALO_BOT_TOKEN = os.environ.get("ZALO_BOT_TOKEN", "EfVUmLxWFIMXorvotNYxHBWEBJDGOVHLvbAFCEViZpdjqmijKlHUOdesfyYaOqLD")
@@ -430,6 +439,43 @@ def extract_ocr_with_vision(image_base64, mime_type, doc_type="cccd"):
                 pass
 
     # 2. Dự phòng qua ZenMux Multi-Modal Vision
+        # 1.5. Dự phòng qua Multi-Gateway (Hy3, MiMo-V2.5, DeepSeek-V4-Flash, Qwen3.8-Flash)
+    if CHAT_GATEWAY_API_KEY:
+        gw_models = ["Hy3", "MiMo-V2.5", "DeepSeek-V4-Flash", "Qwen3.8-Flash", "GLM-5.3-Flash", "deepseek-v4-flash", "qwen3.8-flash"]
+        gw_endpoints = [
+            "https://zenmux.ai/api/v1/chat/completions",
+            "https://api.siliconflow.cn/v1/chat/completions",
+            "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+            "https://api.deepseek.com/v1/chat/completions",
+            "https://openrouter.ai/api/v1/chat/completions"
+        ]
+        for ep in gw_endpoints:
+            for gm in gw_models:
+                try:
+                    payload = {
+                        "model": gm,
+                        "messages": [
+                            {"role": "system", "content": "Bạn là Trợ lý Ảo Chuyên gia Pháp lý Đất đai Thanh Hóa (ThanhHoa Land AI). BẮT BUỘC TRẢ LỜI 100% HOÀN TOÀN BẰNG TIẾNG VIỆT NAM."},
+                            {"role": "user", "content": prompt}
+                        ],
+                        "temperature": 0.2
+                    }
+                    req = urllib.request.Request(
+                        ep,
+                        data=json.dumps(payload).encode("utf-8"),
+                        headers={"Authorization": f"Bearer {CHAT_GATEWAY_API_KEY}", "Content-Type": "application/json"},
+                        method="POST"
+                    )
+                    with urllib.request.urlopen(req, timeout=35) as resp:
+                        data = json.loads(resp.read().decode("utf-8"))
+                        ans = data["choices"][0]["message"]["content"].strip()
+                        if "<think>" in ans and "</think>" in ans:
+                            ans = re.sub(r'<think>.*?</think>', '', ans, flags=re.DOTALL).strip()
+                        if ans and len(ans) > 20:
+                            return ans, f"AI Gateway ({gm})"
+                except Exception as e:
+                    pass
+
     if ZENMUX_API_KEY:
         zenmux_vision_models = ["z-ai/glm-5.3-free", "dots-studio/dots3-note-prev", "deepseek/deepseek-chat"]
         for zm in zenmux_vision_models:
@@ -464,6 +510,51 @@ def extract_ocr_with_vision(image_base64, mime_type, doc_type="cccd"):
                             return extracted, f"ZenMux Vision ({zm})"
             except Exception as e:
                 pass
+
+        # 3. Dự phòng qua GLM-5.3-Flash và DeepSeek-V4-Flash-Vision-Exp
+    if NEW_VISION_API_KEY:
+        new_vision_endpoints = [
+            "https://zenmux.ai/api/v1/chat/completions",
+            "https://api.siliconflow.cn/v1/chat/completions",
+            "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+            "https://api.deepseek.com/v1/chat/completions",
+            "https://openrouter.ai/api/v1/chat/completions"
+        ]
+        new_models = ["GLM-5.3-Flash", "DeepSeek-V4-Flash-Vision-Exp", "glm-5.3-flash", "deepseek-v4-flash-vision-exp", "z-ai/glm-5.3-free"]
+        for ep in new_vision_endpoints:
+            for n_mod in new_models:
+                try:
+                    payload = {
+                        "model": n_mod,
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": [
+                                    {"type": "text", "text": prompt},
+                                    {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{image_base64}"}}
+                                ]
+                            }
+                        ],
+                        "temperature": 0.1
+                    }
+                    req = urllib.request.Request(
+                        ep,
+                        data=json.dumps(payload).encode("utf-8"),
+                        headers={"Authorization": f"Bearer {NEW_VISION_API_KEY}", "Content-Type": "application/json"},
+                        method="POST"
+                    )
+                    with urllib.request.urlopen(req, timeout=30) as resp:
+                        data = json.loads(resp.read().decode("utf-8"))
+                        ans = data["choices"][0]["message"]["content"].strip()
+                        if "<think>" in ans and "</think>" in ans:
+                            ans = re.sub(r'<think>.*?</think>', '', ans, flags=re.DOTALL).strip()
+                        json_m = re.search(r'\{.*\}', ans, re.DOTALL)
+                        if json_m:
+                            extracted = json.loads(json_m.group(0))
+                            if extracted and any(v for v in extracted.values() if v):
+                                return extracted, f"Vision API ({n_mod})"
+                except Exception as e:
+                    pass
 
     return {}, "Không thể bóc tách"
 
