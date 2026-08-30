@@ -672,7 +672,38 @@ def zalo_webhook():
 def api_export_docx():
     if request.method == 'OPTIONS':
         return jsonify({"status": "ok"}), 200
-    return jsonify({"error": "Export DOCX khả dụng trên máy trạm cục bộ."}), 501
+    
+    data = request.get_json(silent=True) or {}
+    title = data.get("title", "Don_Dat_Dai_Thanh_Hoa")
+    content = data.get("content", "")
+    if not content:
+        content = "Không có nội dung đơn."
+
+    # Tạo file tài liệu Word chuẩn HTML tương thích hoàn hảo Microsoft Word
+    html_doc = f"""<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head>
+<meta charset='utf-8'>
+<title>{title}</title>
+<style>
+@page {{ size: A4; margin: 2cm 2cm 2cm 2cm; }}
+body {{ font-family: 'Times New Roman', serif; font-size: 13pt; line-height: 1.3; color: #000; }}
+h3, h4 {{ text-align: center; text-transform: uppercase; margin: 5px 0; }}
+p {{ margin: 4px 0; }}
+table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
+th, td {{ border: 1px solid #333; padding: 6px; font-size: 12pt; }}
+</style>
+</head>
+<body>
+{content.replace(chr(10), '<br>')}
+</body>
+</html>"""
+    
+    from flask import Response
+    return Response(
+        "\ufeff" + html_doc,
+        mimetype="application/msword",
+        headers={"Content-Disposition": f'attachment; filename="{title}.doc"'}
+    )
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
