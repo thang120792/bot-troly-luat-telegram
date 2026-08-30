@@ -58,6 +58,7 @@ CHAT_GATEWAY_API_KEY = os.environ.get("CHAT_GATEWAY_API_KEY", "sk-2poy0rgg408uzh
 CHAT_GATEWAY_API_KEY = os.environ.get("CHAT_GATEWAY_API_KEY", "sk-2poy0rgg408uzhpv45psrpghbwun7hud")
 CHAT_GATEWAY_API_KEY = os.environ.get("CHAT_GATEWAY_API_KEY", "sk-2poy0rgg408uzhpv45psrpghbwun7hud")
 CHAT_GATEWAY_API_KEY = os.environ.get("CHAT_GATEWAY_API_KEY", "sk-2poy0rgg408uzhpv45psrpghbwun7hud")
+CHAT_GATEWAY_API_KEY = os.environ.get("CHAT_GATEWAY_API_KEY", "sk-2poy0rgg408uzhpv45psrpghbwun7hud")
 NEW_VISION_API_KEY = os.environ.get("NEW_VISION_API_KEY", "sk-2poy0rgg408uzhpv45psrpghbwun7hud")
 ZENMUX_API_KEY = os.environ.get("ZENMUX_API_KEY", _decode_k("c2stYWktdjEtNGQ3YTY5ZjU4OTA2ZDNiNDk4M2Q1ZTZkMzI2NTI4YmI5ZWRjYmJmYWJlYTBiN2U0NDBlMzczOGM1YzI5Yjg5ZA=="))
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8128444329:AAEtIfC86tE43PYekXP7GlSUzDboiByCGpg")
